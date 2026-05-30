@@ -1,20 +1,22 @@
 ---
 title: Dialects
-description: Render a single query definition for PostgreSQL, MySQL, and SQLite, with per-dialect placeholders, quoting, RETURNING, and upserts.
+description: Render a single query definition for PostgreSQL and SQLite, with per-dialect placeholders, quoting, boolean literals, and upserts.
 ---
 
 A gooq statement is an abstract query definition, not a string. The same
-definition can be rendered for any supported dialect, and the renderer adapts
-placeholders, identifier quoting, `RETURNING` support, and upsert syntax to the
+definition can be rendered for either supported dialect, and the renderer adapts
+placeholders, identifier quoting, boolean literals, and upsert syntax to the
 target database.
+
+PostgreSQL support targets the latest two major versions (18 and 17). SQLite is
+tested with the pure-Go `modernc.org/sqlite` driver.
 
 ## The dialect values
 
-Three dialect constructors are available, each returning a `gooq.Dialect`:
+Two dialect constructors are available, each returning a `gooq.Dialect`:
 
 ```go
 gooq.Postgres() // PostgreSQL
-gooq.MySQL()    // MySQL
 gooq.SQLite()   // SQLite
 ```
 
@@ -29,16 +31,16 @@ There are two ways to apply a dialect:
 
 ```go
 // Render only.
-sql, args, err := query.SQLFor(gooq.MySQL())
+sql, args, err := query.SQLFor(gooq.SQLite())
 
 // Bind a dialect, then execute.
 rows, err := query.Using(gooq.Postgres()).Fetch(ctx, conn)
 ```
 
-## One query, three renderings
+## One query, two renderings
 
 The single definition below renders differently for each database. Note the
-placeholder style and the identifier quoting:
+placeholder style:
 
 ```go
 query := gooq.
@@ -49,7 +51,6 @@ query := gooq.
 	Limit(5)
 
 pgSQL, pgArgs, _ := query.SQLFor(gooq.Postgres())
-mySQL, myArgs, _ := query.SQLFor(gooq.MySQL())
 liteSQL, liteArgs, _ := query.SQLFor(gooq.SQLite())
 ```
 
@@ -60,53 +61,52 @@ The rendered statements:
 SELECT "book"."title", "book"."price" FROM "book"
 WHERE "book"."price" > $1 ORDER BY "book"."title" ASC LIMIT 5
 
--- MySQL
-SELECT `book`.`title`, `book`.`price` FROM `book`
-WHERE `book`.`price` > ? ORDER BY `book`.`title` ASC LIMIT 5
-
 -- SQLite
 SELECT "book"."title", "book"."price" FROM "book"
 WHERE "book"."price" > ? ORDER BY "book"."title" ASC LIMIT 5
 ```
 
-In every case the argument list is the same — `[]any{10.0}` — because only the
+In both cases the argument list is the same — `[]any{10.0}` — because only the
 rendering changes, not the values.
 
 ## What varies between dialects
 
 ### Placeholders
 
-PostgreSQL uses ordinal placeholders (`$1`, `$2`, …). MySQL and SQLite use
-positional question marks (`?`).
+PostgreSQL uses ordinal placeholders (`$1`, `$2`, …). SQLite uses positional
+question marks (`?`).
 
 ### Identifier quoting
 
-PostgreSQL and SQLite quote identifiers with double quotes (`"book"`). MySQL
-quotes with backticks.
+PostgreSQL and SQLite both quote identifiers with double quotes (`"book"`).
 
-### RETURNING support
+### Boolean literals
 
-PostgreSQL and SQLite support `RETURNING` on INSERT, UPDATE, and DELETE.
-Requesting `Returning` on a dialect that does not support it produces
-`gooq.ErrReturningUnsupported`:
-
-```go
-_, _, err := gooq.
-	InsertInto(db.Book).
-	Columns(db.Book.Title).
-	Values("x").
-	Returning(db.Book.Id).
-	SQLFor(gooq.MySQL())
-// err is gooq.ErrReturningUnsupported
-```
+PostgreSQL renders boolean values as the native `TRUE` / `FALSE` literals. SQLite
+has no boolean type, so the same values render as `1` / `0`.
 
 ### Upsert syntax
 
-PostgreSQL and SQLite express upserts with `ON CONFLICT ... DO UPDATE SET` or
-`DO NOTHING`. MySQL uses `ON DUPLICATE KEY UPDATE`. gooq exposes the matching
-builder methods (`OnConflict` / `DoUpdateSet` / `DoNothing` versus
-`OnDuplicateKeyUpdate`); see
-[Inserts, Updates & Deletes](/gooq/guides/inserts-updates-deletes/).
+Both PostgreSQL and SQLite express upserts with `ON CONFLICT ... DO UPDATE SET`
+or `DO NOTHING`. The helper `gooq.SetToExcluded(field)` assigns a column to the
+value that would have been inserted; the pseudo-row is named `EXCLUDED.` on
+PostgreSQL and `excluded.` on SQLite:
+
+```sql
+-- PostgreSQL
+ON CONFLICT ("id") DO UPDATE SET "title" = EXCLUDED."title"
+
+-- SQLite
+ON CONFLICT ("id") DO UPDATE SET "title" = excluded."title"
+```
+
+See [Inserts, Updates & Deletes](/gooq/guides/inserts-updates-deletes/) for the
+builder methods that produce these clauses.
+
+### RETURNING
+
+Both PostgreSQL and SQLite support `RETURNING` on INSERT, UPDATE, and DELETE, so
+`Returning(cols...)` renders for either dialect.
 
 ## Drivers are separate from dialects
 
@@ -117,7 +117,6 @@ terminals:
 ```go
 import (
 	_ "github.com/jackc/pgx/v5/stdlib" // PostgreSQL
-	_ "github.com/go-sql-driver/mysql" // MySQL
 	_ "modernc.org/sqlite"             // SQLite
 )
 ```

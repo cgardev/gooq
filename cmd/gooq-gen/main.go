@@ -8,8 +8,8 @@
 // package. The jooq library itself imports no database driver. To run this
 // command, the caller builds it with their driver blank-imported, for example:
 //
-//	import _ "github.com/lib/pq"              // for the "postgres" driver
-//	import _ "github.com/go-sql-driver/mysql" // for the "mysql" driver
+//	import _ "github.com/jackc/pgx/v5/stdlib" // for the "postgres" driver
+//	import _ "modernc.org/sqlite"             // for the "sqlite" driver
 //
 // and then invokes the resulting binary with the appropriate flags.
 package main

@@ -7,7 +7,9 @@ import "errors"
 var ErrTooManyRows = errors.New("jooq: query returned more than one row")
 
 // ErrReturningUnsupported is recorded when a RETURNING clause is requested for a
-// dialect that does not support it (currently MySQL).
+// dialect that does not support it. Both supported dialects (PostgreSQL and
+// SQLite) render RETURNING natively, so this sentinel exists as a defensive
+// guard for any dialect whose supportsReturning reports false.
 var ErrReturningUnsupported = errors.New("jooq: RETURNING is not supported by this dialect")
 
 // ErrEmptyInsert is recorded when an INSERT statement has neither columns nor a

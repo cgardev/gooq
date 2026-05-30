@@ -42,9 +42,8 @@ if helpful, the SQL you expected instead.
 
 ## Dialect
 
-- [ ] postgres
-- [ ] mysql
-- [ ] sqlite
+- [ ] PostgreSQL
+- [ ] SQLite
 
 ## Go version
 

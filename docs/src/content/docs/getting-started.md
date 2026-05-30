@@ -136,5 +136,5 @@ sql, args, err := gooq.
   surface and the step interfaces that enforce clause order.
 - [Predicates & Conditions](/gooq/guides/predicates-and-conditions/) describes
   the operators available on every field.
-- [Dialects](/gooq/guides/dialects/) explains how one query renders for three
-  databases.
+- [Dialects](/gooq/guides/dialects/) explains how one query renders for both
+  supported databases.

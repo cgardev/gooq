@@ -1,6 +1,6 @@
 # gooq
 
-A type-safe, fluent, zero-dependency SQL query builder for Go, inspired by [jOOQ](https://www.jooq.org/). `gooq` gives you parametric `Field[T]` columns whose comparison methods reject mismatched types at compile time, positional `RecordN` row types that preserve each projected column's Go type by position, step interfaces that turn clause order into a compile-time concern (you cannot place `WHERE` after `GROUP BY`, but you may omit it entirely), and runtime dialect translation: a query is built once as a detached abstract syntax tree and rendered to dialect-specific SQL for PostgreSQL, MySQL, or SQLite at execution time.
+A type-safe, fluent, zero-dependency SQL query builder for Go, inspired by [jOOQ](https://www.jooq.org/). `gooq` gives you parametric `Field[T]` columns whose comparison methods reject mismatched types at compile time, positional `RecordN` row types that preserve each projected column's Go type by position, step interfaces that turn clause order into a compile-time concern (you cannot place `WHERE` after `GROUP BY`, but you may omit it entirely), and runtime dialect translation: a query is built once as a detached abstract syntax tree and rendered to dialect-specific SQL for PostgreSQL and SQLite at execution time.
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/cgardev/gooq.svg)](https://pkg.go.dev/github.com/cgardev/gooq)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -69,8 +69,8 @@ promise — SQL the compiler checks — while staying idiomatic Go.
 - **Type-safe columns.** A `Field[T]` accepts only values of its own type `T`, so `db.Book.Price.GT(10)` compiles while comparing a price against a string does not.
 - **Positional typed results.** `Select1` through `Select22` return `SelectFromStep[RecordN[...]]`, and each fetched row preserves the projected column types by position (`row.V1`, `row.V2`, ...).
 - **Compile-time clause order.** Each builder method returns the interface describing the clauses that may legally follow, encoding the legal SQL grammar in the type system.
-- **Runtime dialect translation.** One abstract syntax tree renders to PostgreSQL, MySQL, or SQLite through `SQLFor` or `Using`, including dialect-specific placeholders, identifier quoting, `RETURNING`, and upsert syntax.
-- **Full DML coverage.** `SELECT` (with joins, `GROUP BY`, `HAVING`, `ORDER BY`, `LIMIT`/`OFFSET`), `INSERT` (with `ON CONFLICT`/`ON DUPLICATE KEY UPDATE` upserts and `RETURNING`), `UPDATE`, and `DELETE`.
+- **Runtime dialect translation.** One abstract syntax tree renders to PostgreSQL and SQLite through `SQLFor` or `Using`, including dialect-specific placeholders, identifier quoting, `RETURNING`, and upsert syntax.
+- **Full DML coverage.** `SELECT` (with joins, `GROUP BY`, `HAVING`, `ORDER BY`, `LIMIT`/`OFFSET`), `INSERT` (with `ON CONFLICT` upserts and `RETURNING`), `UPDATE`, and `DELETE`.
 - **Composable predicates.** A `Condition` is itself a `Field[bool]`, so it can be stored in a variable and combined with `And`, `Or`, and `Not`.
 - **Code generation.** `gooq-gen` introspects `information_schema` and emits typed table accessors.
 - **Zero dependencies.** The core module imports nothing outside the standard library and ships no database driver; you blank-import your own.
@@ -144,7 +144,7 @@ func main() {
 
 `Fetch` returns every matching row. To read a single row, use `FetchOne` (returns the zero value when nothing matches and `gooq.ErrTooManyRows` when more than one matches) or `FetchSingle` (returns `sql.ErrNoRows` when nothing matches). The `conn` argument is a `gooq.Querier`, satisfied by `*sql.DB`, `*sql.Tx`, and `*sql.Conn`.
 
-### One AST, three dialects
+### One AST, two dialects
 
 The query is rendered, not re-built, so the same value produces SQL for every dialect via `SQLFor`:
 
@@ -156,11 +156,9 @@ q := gooq.Select2(db.Book.Title, db.Book.Price).
 	Limit(20)
 
 pg, args, _ := q.SQLFor(gooq.Postgres())
-my, _, _ := q.SQLFor(gooq.MySQL())
 sq, _, _ := q.SQLFor(gooq.SQLite())
 
 fmt.Println(pg)   // SELECT "book"."title", "book"."price" FROM "book" WHERE "book"."price" > $1 ORDER BY "book"."title" ASC LIMIT 20
-fmt.Println(my)   // SELECT `book`.`title`, `book`.`price` FROM `book` WHERE `book`.`price` > ? ORDER BY `book`.`title` ASC LIMIT 20
 fmt.Println(sq)   // SELECT "book"."title", "book"."price" FROM "book" WHERE "book"."price" > ? ORDER BY "book"."title" ASC LIMIT 20
 fmt.Println(args) // [10]
 ```
@@ -169,7 +167,7 @@ Call `Using(dialect)` to bind a dialect for the terminal `SQL`, `Fetch`, `FetchO
 
 ### INSERT with upsert
 
-`SetToExcluded` sets a column to the value the conflicting `INSERT` attempted to write (`EXCLUDED.col` on PostgreSQL and SQLite, `VALUES(col)` on MySQL):
+`SetToExcluded` sets a column to the value the conflicting `INSERT` attempted to write (`EXCLUDED.col` on PostgreSQL and `excluded.col` on SQLite):
 
 ```go
 _, err := gooq.InsertInto(db.Book).
@@ -180,7 +178,7 @@ _, err := gooq.InsertInto(db.Book).
 	Execute(ctx, conn)
 ```
 
-Use `OnConflictDoNothing()` to ignore the conflict, or `OnDuplicateKeyUpdate(...)` for the MySQL-flavored spelling. `Returning(cols...)` is available on PostgreSQL and SQLite (it records `gooq.ErrReturningUnsupported` on MySQL).
+Use `OnConflictDoNothing()` to ignore the conflict. `Returning(cols...)` is available on both PostgreSQL and SQLite.
 
 ### UPDATE
 
@@ -281,7 +279,7 @@ The library itself imports no database driver, so the generator is built with yo
 go run github.com/cgardev/gooq/cmd/gooq-gen -dsn "postgres://localhost:5432/library?sslmode=disable" -o internal/db
 ```
 
-Flags: `-driver` (the `database/sql` driver name, default `postgres`), `-dsn` (required), `-schema` (default `public`), `-o` (output directory, default `internal/db`), and `-package` (default `db`). Because the command opens the connection through `database/sql`, the chosen driver must be blank-imported into the build, for example `_ "github.com/lib/pq"` for PostgreSQL or `_ "github.com/go-sql-driver/mysql"` for MySQL.
+Flags: `-driver` (the `database/sql` driver name, default `postgres`), `-dsn` (required), `-schema` (default `public`), `-o` (output directory, default `internal/db`), and `-package` (default `db`). Because the command opens the connection through `database/sql`, the chosen driver must be blank-imported into the build, for example `_ "github.com/lib/pq"` for PostgreSQL or `_ "modernc.org/sqlite"` for SQLite.
 
 ### Column type mapping
 
@@ -291,16 +289,20 @@ Nullable columns whose element is a scalar are wrapped in the generic `sql.Null[
 
 ## Dialects
 
-| Capability | `Postgres()` | `MySQL()` | `SQLite()` |
-| --- | --- | --- | --- |
-| Bind placeholders | `$1`, `$2`, ... | `?` | `?` |
-| Identifier quoting | `"name"` | `` `name` `` | `"name"` |
-| Boolean literals | `TRUE` / `FALSE` | `1` / `0` | `1` / `0` |
-| `RETURNING` | yes | no (records `ErrReturningUnsupported`) | yes |
-| Upsert syntax | `ON CONFLICT (...) DO UPDATE` / `DO NOTHING` | `ON DUPLICATE KEY UPDATE` | `ON CONFLICT (...) DO UPDATE` / `DO NOTHING` |
-| Excluded-row reference | `EXCLUDED.col` | `VALUES(col)` | `excluded.col` |
+gooq targets the latest two PostgreSQL majors (18 and 17) and SQLite. The SQLite
+support is tested with the pure-Go [modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite)
+driver.
 
-`ILike` renders as `ILIKE` on PostgreSQL and as a plain `LIKE` on MySQL and SQLite, whose `LIKE` is already case-insensitive for ASCII text.
+| Capability | `Postgres()` | `SQLite()` |
+| --- | --- | --- |
+| Bind placeholders | `$1`, `$2`, ... | `?` |
+| Identifier quoting | `"name"` | `"name"` |
+| Boolean literals | `TRUE` / `FALSE` | `1` / `0` |
+| `RETURNING` | yes | yes |
+| Upsert syntax | `ON CONFLICT (...) DO UPDATE` / `DO NOTHING` | `ON CONFLICT (...) DO UPDATE` / `DO NOTHING` |
+| Excluded-row reference | `EXCLUDED.col` | `excluded.col` |
+
+`ILike` renders as `ILIKE` on PostgreSQL and as a plain `LIKE` on SQLite, whose `LIKE` is already case-insensitive for ASCII text.
 
 ## Testing
 
@@ -337,9 +339,9 @@ Implemented and covered by tests:
 - `SELECT` with joins, `WHERE`/`AND`/`OR`, `GROUP BY`, `HAVING`, `ORDER BY`, and `LIMIT`/`OFFSET`
 - `INSERT`, `UPDATE`, and `DELETE`
 - `RETURNING` on PostgreSQL and SQLite
-- Upserts (`ON CONFLICT` / `ON DUPLICATE KEY UPDATE`)
+- Upserts (`ON CONFLICT ... DO UPDATE` / `DO NOTHING`)
 - `Field[T]` arities `Select1` through `Select22` with positional `RecordN` results
-- PostgreSQL, MySQL, and SQLite dialect rendering
+- PostgreSQL and SQLite dialect rendering
 - Schema-driven code generation via `gooq-gen`
 
 Not yet implemented:

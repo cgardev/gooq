@@ -46,7 +46,7 @@ func run(schemaPath, outDir string) error {
 	defer cancel()
 
 	container, err := postgres.Run(ctx,
-		"postgres:16-alpine",
+		postgresImage(),
 		postgres.WithDatabase("integration"),
 		postgres.WithUsername("integration"),
 		postgres.WithPassword("integration"),
@@ -115,4 +115,15 @@ func defaultSchemaPath() string {
 // defaultOutDir returns the default output directory for generated files.
 func defaultOutDir() string {
 	return filepath.Join(moduleRoot(), "internal", "db")
+}
+
+// postgresImage returns the PostgreSQL container image used to regenerate the
+// accessors. It honors GOOQ_PG_IMAGE and otherwise defaults to the latest
+// supported major, keeping the generator aligned with the supported versions
+// (PostgreSQL 18 and 17).
+func postgresImage() string {
+	if image := os.Getenv("GOOQ_PG_IMAGE"); image != "" {
+		return image
+	}
+	return "postgres:18-alpine"
 }

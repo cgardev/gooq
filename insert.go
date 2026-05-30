@@ -6,9 +6,8 @@ import (
 )
 
 // upsertClause is the conflict-resolution tail of an INSERT statement. Its
-// rendering is delegated to the active dialect because the syntax diverges
-// structurally between PostgreSQL/SQLite (ON CONFLICT) and MySQL (ON DUPLICATE
-// KEY UPDATE).
+// rendering is delegated to the active dialect, which emits the PostgreSQL and
+// SQLite ON CONFLICT ... DO ... form.
 type upsertClause struct {
 	conflictCols []string
 	doNothing    bool

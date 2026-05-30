@@ -3,7 +3,6 @@ package gooq
 import (
 	"context"
 	"database/sql/driver"
-	"errors"
 	"reflect"
 	"testing"
 )
@@ -95,29 +94,6 @@ func TestInsertGolden(t *testing.T) {
 			[]any{"Go"},
 		)
 	})
-}
-
-func TestInsertMySQLUpsert(t *testing.T) {
-	q := InsertInto(Book).Columns(Book.ID, Book.Title).Values(int64(1), "Go").
-		OnDuplicateKeyUpdate(SetToExcluded(Book.Title))
-	sql, args, err := q.SQLFor(MySQL())
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := "INSERT INTO `book` (`id`, `title`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `title` = VALUES(`title`)"
-	if sql != want {
-		t.Errorf("sql  = %q\nwant = %q", sql, want)
-	}
-	if !reflect.DeepEqual(args, []any{int64(1), "Go"}) {
-		t.Errorf("args = %#v", args)
-	}
-}
-
-func TestReturningUnsupportedOnMySQL(t *testing.T) {
-	q := InsertInto(Book).Columns(Book.Title).Values("Go").Returning(Book.ID)
-	if _, _, err := q.SQLFor(MySQL()); !errors.Is(err, ErrReturningUnsupported) {
-		t.Fatalf("err = %v, want ErrReturningUnsupported", err)
-	}
 }
 
 func TestUpdateGolden(t *testing.T) {

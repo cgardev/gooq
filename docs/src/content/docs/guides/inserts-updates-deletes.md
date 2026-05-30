@@ -67,11 +67,8 @@ sql, args, err := gooq.
 
 ## Upserts
 
-An upsert resolves a unique-key conflict instead of failing. The syntax differs
-between databases, so gooq exposes the PostgreSQL/SQLite form and the MySQL form
-separately.
-
-### PostgreSQL and SQLite
+An upsert resolves a unique-key conflict instead of failing. Both PostgreSQL and
+SQLite express it with `ON CONFLICT`.
 
 Use `OnConflict` with either `DoUpdateSet` or `DoNothing`. The helper
 `gooq.SetToExcluded(field)` assigns a column to the value that would have been
@@ -103,24 +100,6 @@ gooq.
 	Values(1, "Already Present").
 	OnConflict(db.Book.Id).
 	DoNothing()
-```
-
-### MySQL
-
-MySQL spells the same operation as `ON DUPLICATE KEY UPDATE`:
-
-```go
-sql, args, err := gooq.
-	InsertInto(db.Book).
-	Columns(db.Book.Id, db.Book.Title, db.Book.Price).
-	Values(1, "The Go Programming Language", 39.99).
-	OnDuplicateKeyUpdate(
-		db.Book.Title.Set("The Go Programming Language"),
-		db.Book.Price.Set(39.99),
-	).
-	SQLFor(gooq.MySQL())
-// INSERT INTO `book` (`id`, `title`, `price`) VALUES (?, ?, ?)
-// ON DUPLICATE KEY UPDATE `title` = ?, `price` = ?
 ```
 
 ## UPDATE

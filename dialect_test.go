@@ -23,10 +23,6 @@ func TestCrossDialectRendering(t *testing.T) {
 			`SELECT "book"."title", "book"."price" FROM "book" WHERE "book"."price" > $1 ORDER BY "book"."title" ASC LIMIT 20 OFFSET 40`,
 		},
 		{
-			MySQL(),
-			"SELECT `book`.`title`, `book`.`price` FROM `book` WHERE `book`.`price` > ? ORDER BY `book`.`title` ASC LIMIT 20 OFFSET 40",
-		},
-		{
 			SQLite(),
 			`SELECT "book"."title", "book"."price" FROM "book" WHERE "book"."price" > ? ORDER BY "book"."title" ASC LIMIT 20 OFFSET 40`,
 		},
@@ -54,7 +50,6 @@ func TestOffsetOnlyPerDialect(t *testing.T) {
 		want    string
 	}{
 		{Postgres(), `SELECT "book"."id" FROM "book" OFFSET 5`},
-		{MySQL(), "SELECT `book`.`id` FROM `book` LIMIT 18446744073709551615 OFFSET 5"},
 		{SQLite(), `SELECT "book"."id" FROM "book" LIMIT -1 OFFSET 5`},
 	}
 	for _, tc := range tests {
@@ -76,7 +71,6 @@ func TestDialectBoolLiteral(t *testing.T) {
 		t, f string
 	}{
 		{Postgres(), "TRUE", "FALSE"},
-		{MySQL(), "1", "0"},
 		{SQLite(), "1", "0"},
 	}
 	for _, c := range cases {
@@ -108,8 +102,8 @@ func TestILikePerDialect(t *testing.T) {
 	if want := `SELECT "book"."title" FROM "book" WHERE "book"."title" ILIKE $1`; pg != want {
 		t.Errorf("pg = %q, want %q", pg, want)
 	}
-	my, _, _ := q.SQLFor(MySQL())
-	if want := "SELECT `book`.`title` FROM `book` WHERE `book`.`title` LIKE ?"; my != want {
-		t.Errorf("mysql = %q, want %q", my, want)
+	lite, _, _ := q.SQLFor(SQLite())
+	if want := `SELECT "book"."title" FROM "book" WHERE "book"."title" LIKE ?`; lite != want {
+		t.Errorf("sqlite = %q, want %q", lite, want)
 	}
 }

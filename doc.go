@@ -5,7 +5,7 @@
 //
 // The package has no external dependencies. Queries are built as a detached
 // abstract syntax tree and rendered to dialect-specific SQL at execution time,
-// so the same query can target PostgreSQL, MySQL, or SQLite.
+// so the same query can target PostgreSQL or SQLite.
 package gooq
 
 //go:generate go run ./internal/gen

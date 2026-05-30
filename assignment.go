@@ -23,8 +23,8 @@ func (a *assignmentNode) render(b *builder) {
 func (a *assignmentNode) assignment() {}
 
 // SetToExcluded builds an upsert assignment that sets a column to the value the
-// conflicting INSERT attempted to write (EXCLUDED.col in PostgreSQL and SQLite,
-// VALUES(col) in MySQL). It is used inside DoUpdate and OnDuplicateKeyUpdate.
+// conflicting INSERT attempted to write (EXCLUDED.col in PostgreSQL and
+// excluded.col in SQLite). It is used inside DoUpdateSet.
 func SetToExcluded(f AnyField) Assignment {
 	return &assignmentNode{column: f.Name(), val: &excludedNode{column: f.Name()}}
 }

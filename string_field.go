@@ -7,8 +7,8 @@ type StringField interface {
 	Like(pattern string) Condition
 	NotLike(pattern string) Condition
 	// ILike performs a case-insensitive match. It maps to ILIKE on PostgreSQL
-	// and to a plain LIKE on MySQL and SQLite, whose LIKE is already
-	// case-insensitive for ASCII text.
+	// and to a plain LIKE on SQLite, whose LIKE is already case-insensitive for
+	// ASCII text.
 	ILike(pattern string) Condition
 }
 

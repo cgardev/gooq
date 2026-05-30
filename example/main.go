@@ -51,9 +51,8 @@ func main() {
 		Limit(20)
 	show("postgres", q)
 
-	fmt.Println("\nThe same query AST rendered for three dialects:")
+	fmt.Println("\nThe same query AST rendered for both dialects:")
 	showFor("postgres", q, gooq.Postgres())
-	showFor("mysql", q, gooq.MySQL())
 	showFor("sqlite", q, gooq.SQLite())
 
 	fmt.Println("\nTyped JOIN with an aliased table:")
@@ -70,7 +69,7 @@ func main() {
 		OnConflict(db.Book.Id).
 		DoUpdateSet(gooq.SetToExcluded(db.Book.Title), gooq.SetToExcluded(db.Book.Price))
 	show("postgres", ins)
-	showFor("mysql", ins, gooq.MySQL())
+	showFor("sqlite", ins, gooq.SQLite())
 
 	fmt.Println("\nUPDATE and DELETE:")
 	show("update", gooq.Update(db.Book).

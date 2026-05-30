@@ -102,24 +102,6 @@ func TestDeleteWithoutWhere(t *testing.T) {
 	)
 }
 
-// TestUpdateReturningUnsupportedOnMySQL confirms that an UPDATE RETURNING is
-// rejected for MySQL.
-func TestUpdateReturningUnsupportedOnMySQL(t *testing.T) {
-	q := Update(Book).Set(Book.Price.Set(10)).Where(Book.ID.EQ(1)).Returning(Book.ID)
-	if _, _, err := q.SQLFor(MySQL()); !errors.Is(err, ErrReturningUnsupported) {
-		t.Fatalf("err = %v, want ErrReturningUnsupported", err)
-	}
-}
-
-// TestDeleteReturningUnsupportedOnMySQL confirms that a DELETE RETURNING is
-// rejected for MySQL.
-func TestDeleteReturningUnsupportedOnMySQL(t *testing.T) {
-	q := DeleteFrom(Book).Where(Book.ID.EQ(1)).Returning(Book.ID)
-	if _, _, err := q.SQLFor(MySQL()); !errors.Is(err, ErrReturningUnsupported) {
-		t.Fatalf("err = %v, want ErrReturningUnsupported", err)
-	}
-}
-
 // TestHighAritySelectGolden renders a Select8 to confirm the generated
 // higher-arity constructors project every column in order.
 func TestHighAritySelectGolden(t *testing.T) {
@@ -165,17 +147,19 @@ func TestHighArityRecordRoundTrip(t *testing.T) {
 	}
 }
 
-// TestCrossDialectInsert renders the same INSERT for MySQL and SQLite and
-// asserts the placeholder and identifier-quoting differences between them.
+// TestCrossDialectInsert renders the same INSERT for PostgreSQL and SQLite and
+// asserts the placeholder difference between them. Both dialects double-quote
+// identifiers, so the rendered SQL differs only in the bind placeholders ($1,
+// $2 versus ?, ?) while the arguments stay identical.
 func TestCrossDialectInsert(t *testing.T) {
 	q := InsertInto(Book).Columns(Book.ID, Book.Title).Values(int64(1), "Go")
 
-	mySQL, myArgs, err := q.SQLFor(MySQL())
+	postgresSQL, postgresArgs, err := q.SQLFor(Postgres())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := "INSERT INTO `book` (`id`, `title`) VALUES (?, ?)"; mySQL != want {
-		t.Errorf("mysql = %q, want %q", mySQL, want)
+	if want := `INSERT INTO "book" ("id", "title") VALUES ($1, $2)`; postgresSQL != want {
+		t.Errorf("postgres = %q, want %q", postgresSQL, want)
 	}
 
 	sqliteSQL, sqliteArgs, err := q.SQLFor(SQLite())
@@ -186,12 +170,13 @@ func TestCrossDialectInsert(t *testing.T) {
 		t.Errorf("sqlite = %q, want %q", sqliteSQL, want)
 	}
 
-	// The two renderings differ in quoting but share identical arguments.
-	if mySQL == sqliteSQL {
-		t.Error("mysql and sqlite renderings should differ in identifier quoting")
+	// The two renderings differ in their bind placeholders but share identical
+	// arguments.
+	if postgresSQL == sqliteSQL {
+		t.Error("postgres and sqlite renderings should differ in bind placeholders")
 	}
-	if !reflect.DeepEqual(myArgs, sqliteArgs) {
-		t.Errorf("args differ: mysql=%#v sqlite=%#v", myArgs, sqliteArgs)
+	if !reflect.DeepEqual(postgresArgs, sqliteArgs) {
+		t.Errorf("args differ: postgres=%#v sqlite=%#v", postgresArgs, sqliteArgs)
 	}
 }
 

@@ -40,8 +40,8 @@ type typeMapping struct {
 
 // normalizeType reduces a raw SQL data type to a comparable key. It lowercases
 // the input, trims surrounding whitespace, removes any parenthesized size or
-// precision suffix (for example "(10,2)" or "(255)"), and drops the MySQL
-// "unsigned" and "zerofill" modifiers.
+// precision suffix (for example "(10,2)" or "(255)"), and drops trailing
+// "unsigned" and "zerofill" modifiers so the base type is recognized.
 func normalizeType(dataType string) string {
 	t := strings.ToLower(strings.TrimSpace(dataType))
 	if i := strings.IndexByte(t, '('); i >= 0 {

@@ -124,8 +124,8 @@ func TestSelectUsingDialectOverride(t *testing.T) {
 		t.Errorf("postgres = %q, want %q", pgSQL, want)
 	}
 
-	mySQL, _, _ := q.SQLFor(MySQL())
-	if want := "SELECT `book`.`id` FROM `book` WHERE `book`.`id` = ?"; mySQL != want {
-		t.Errorf("mysql = %q, want %q", mySQL, want)
+	sqliteSQL, _, _ := q.SQLFor(SQLite())
+	if want := `SELECT "book"."id" FROM "book" WHERE "book"."id" = ?`; sqliteSQL != want {
+		t.Errorf("sqlite = %q, want %q", sqliteSQL, want)
 	}
 }

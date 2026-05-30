@@ -11,7 +11,6 @@ func TestBuilderWriteIdentifierQuotingPerDialect(t *testing.T) {
 	}{
 		{"postgres qualified", Postgres(), []string{"book", "title"}, `"book"."title"`},
 		{"sqlite qualified", SQLite(), []string{"book", "title"}, `"book"."title"`},
-		{"mysql qualified", MySQL(), []string{"book", "title"}, "`book`.`title`"},
 		{"postgres single", Postgres(), []string{"id"}, `"id"`},
 	}
 	for _, tc := range tests {
@@ -32,10 +31,10 @@ func TestBuilderIdentifierEscaping(t *testing.T) {
 		t.Fatalf("escaping = %q, want %q", got, want)
 	}
 
-	b2 := newBuilder(MySQL())
-	b2.writeIdentifier("ba`d")
-	if got, want := b2.sql.String(), "`ba``d`"; got != want {
-		t.Fatalf("mysql escaping = %q, want %q", got, want)
+	b2 := newBuilder(SQLite())
+	b2.writeIdentifier(`ba"d`)
+	if got, want := b2.sql.String(), `"ba""d"`; got != want {
+		t.Fatalf("sqlite escaping = %q, want %q", got, want)
 	}
 }
 
@@ -54,14 +53,12 @@ func TestBuilderBindPlaceholdersIncrement(t *testing.T) {
 	}
 }
 
-func TestBuilderBindPlaceholdersMySQLSQLite(t *testing.T) {
-	for _, d := range []Dialect{MySQL(), SQLite()} {
-		b := newBuilder(d)
-		b.bind(1)
-		b.bind(2)
-		if got, want := b.sql.String(), "??"; got != want {
-			t.Fatalf("%s placeholders = %q, want %q", d.Name(), got, want)
-		}
+func TestBuilderBindPlaceholdersSQLite(t *testing.T) {
+	b := newBuilder(SQLite())
+	b.bind(1)
+	b.bind(2)
+	if got, want := b.sql.String(), "??"; got != want {
+		t.Fatalf("sqlite placeholders = %q, want %q", got, want)
 	}
 }
 

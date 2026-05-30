@@ -53,6 +53,24 @@ var publishedGo = time.Date(2015, time.October, 26, 12, 0, 0, 0, time.UTC)
 // isolated while remaining fast.
 var sharedDB *sql.DB
 
+// defaultPostgresImage is the container image used when GOOQ_PG_IMAGE is not set.
+// The library supports the latest two PostgreSQL majors (18 and 17); the suite is
+// run once per supported image.
+const defaultPostgresImage = "postgres:18-alpine"
+
+// postgresImage returns the PostgreSQL container image for this run. Continuous
+// integration drives the version matrix by re-running the whole suite once per
+// supported image, setting GOOQ_PG_IMAGE to "postgres:18-alpine" and then to
+// "postgres:17-alpine". Only a single container is ever started per process; the
+// matrix is external, so the shared-container plus per-test-transaction design is
+// preserved.
+func postgresImage() string {
+	if image := os.Getenv("GOOQ_PG_IMAGE"); image != "" {
+		return image
+	}
+	return defaultPostgresImage
+}
+
 // TestMain starts one PostgreSQL container for the package, applies the schema,
 // runs the tests, and tears the container down afterwards. When Docker is
 // unavailable the suite still runs so that every test skips with a clear reason.
@@ -69,7 +87,7 @@ func runSuite(m *testing.M) int {
 	ctx := context.Background()
 
 	container, err := postgres.Run(ctx,
-		"postgres:16-alpine",
+		postgresImage(),
 		postgres.WithDatabase("integration"),
 		postgres.WithUsername("integration"),
 		postgres.WithPassword("integration"),

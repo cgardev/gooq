@@ -1,7 +1,6 @@
 package gooq
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 )
@@ -12,7 +11,7 @@ import (
 // one query can target multiple databases.
 //
 // The interface is sealed: its operative methods are unexported, so callers
-// obtain dialects only through Postgres, MySQL, and SQLite.
+// obtain dialects only through Postgres and SQLite.
 type Dialect interface {
 	// Name returns the canonical dialect identifier.
 	Name() string
@@ -37,7 +36,7 @@ type Dialect interface {
 	supportsReturning() bool
 
 	// renderUpsert writes the conflict-resolution tail of an INSERT statement,
-	// covering everything from ON CONFLICT or ON DUPLICATE KEY onward.
+	// covering everything from ON CONFLICT onward.
 	renderUpsert(b *builder, u *upsertClause)
 
 	// excludedRef renders a reference to the conflicting row's column inside an
@@ -48,10 +47,6 @@ type Dialect interface {
 // Postgres returns the PostgreSQL dialect: double-quoted identifiers, numbered
 // placeholders ($1, $2, ...), native RETURNING, and ON CONFLICT upserts.
 func Postgres() Dialect { return postgres{} }
-
-// MySQL returns the MySQL dialect: backtick-quoted identifiers, anonymous
-// placeholders (?), no RETURNING, and ON DUPLICATE KEY UPDATE upserts.
-func MySQL() Dialect { return mysql{} }
 
 // SQLite returns the SQLite dialect: double-quoted identifiers, anonymous
 // placeholders (?), native RETURNING, and ON CONFLICT upserts.
@@ -66,7 +61,8 @@ func quoteWith(part string, q byte) string {
 
 // renderLimitOffset writes the LIMIT/OFFSET fragment shared by every dialect
 // that uses the "LIMIT n OFFSET m" form. forceLimit supplies a synthetic upper
-// bound for the offset-without-limit case (required by MySQL).
+// bound for the offset-without-limit case; an empty value omits the synthetic
+// LIMIT entirely.
 func renderLimitOffset(b *builder, limit, offset *int64, forceLimit string) {
 	switch {
 	case limit != nil:
@@ -134,55 +130,6 @@ func (sqlite) excludedRef(b *builder, column string) {
 
 func (d sqlite) renderUpsert(b *builder, u *upsertClause) {
 	renderOnConflict(b, d, u)
-}
-
-type mysql struct{}
-
-func (mysql) Name() string                    { return "mysql" }
-func (mysql) quoteIdentifier(p string) string { return quoteWith(p, '`') }
-func (mysql) placeholder(int) string          { return "?" }
-func (mysql) supportsReturning() bool         { return false }
-func (mysql) boolLiteral(v bool) string {
-	if v {
-		return "1"
-	}
-	return "0"
-}
-
-func (mysql) renderLimit(b *builder, limit, offset *int64) {
-	// MySQL requires a LIMIT before OFFSET; supply the maximum unsigned BIGINT
-	// as the synthetic upper bound when only an offset is present.
-	renderLimitOffset(b, limit, offset, "18446744073709551615")
-}
-
-func (d mysql) excludedRef(b *builder, column string) {
-	b.writeString("VALUES(")
-	b.writeIdentifier(column)
-	b.writeString(")")
-}
-
-func (d mysql) renderUpsert(b *builder, u *upsertClause) {
-	if u.doNothing {
-		// MySQL has no DO NOTHING; INSERT IGNORE is the closest equivalent but
-		// must precede the table, which the renderer cannot retroactively edit.
-		// Emulate a no-op by assigning the first conflict column to itself.
-		b.writeString(" ON DUPLICATE KEY UPDATE ")
-		if len(u.conflictCols) > 0 {
-			b.writeIdentifier(u.conflictCols[0])
-			b.writeString(" = ")
-			b.writeIdentifier(u.conflictCols[0])
-		} else {
-			b.setError(fmt.Errorf("jooq: mysql upsert DO NOTHING requires at least one conflict column"))
-		}
-		return
-	}
-	b.writeString(" ON DUPLICATE KEY UPDATE ")
-	for i, a := range u.assignments {
-		if i > 0 {
-			b.writeString(", ")
-		}
-		a.render(b)
-	}
 }
 
 // renderOnConflict writes the PostgreSQL/SQLite "ON CONFLICT ... DO ..." tail.
