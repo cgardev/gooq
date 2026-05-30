@@ -1,0 +1,99 @@
+name: CI
+
+# Run the full continuous integration suite on every push and pull request
+# targeting the default branch.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same reference to conserve runner minutes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # The core job validates the dependency-free root module: it builds, vets,
+  # checks formatting, runs the unit tests, and asserts that go.mod declares
+  # no external requirements.
+  core:
+    name: Core module
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up the Go toolchain
+        uses: actions/setup-go@v5
+        with:
+          # Resolve the exact patch version from the root go.mod file so the
+          # workflow tracks the project requirement automatically.
+          go-version-file: go.mod
+          # Enable the built-in module and build caching provided by setup-go.
+          cache: true
+
+      - name: Build all packages
+        run: go build ./...
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Verify formatting with gofmt
+        run: |
+          # gofmt -l lists files that are not correctly formatted. The build
+          # must fail when that list is non-empty.
+          unformatted="$(gofmt -l .)"
+          if [ -n "${unformatted}" ]; then
+            echo "The following files are not gofmt-formatted:"
+            echo "${unformatted}"
+            exit 1
+          fi
+
+      - name: Assert the core module has zero external dependencies
+        run: |
+          # The root module must remain dependency-free, so go.mod must not
+          # contain any 'require' directive. Count matching lines and fail if
+          # any are present.
+          require_count="$(grep -c '^[[:space:]]*require' go.mod || true)"
+          if [ "${require_count}" -ne 0 ]; then
+            echo "The core go.mod must not contain any require directive, found ${require_count}:"
+            grep -n '^[[:space:]]*require' go.mod
+            exit 1
+          fi
+
+      - name: Run unit tests
+        run: go test ./... -count=1
+
+  # The integration job validates the separate integration module, which uses
+  # testcontainers to start a real PostgreSQL instance. The Docker daemon
+  # available on ubuntu-latest satisfies this requirement without extra
+  # services. It runs independently of the core job.
+  integration:
+    name: Integration module
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up the Go toolchain
+        uses: actions/setup-go@v5
+        with:
+          # Resolve the Go version from the integration module's go.mod, and
+          # point the cache at its lock file so dependency caching is accurate.
+          go-version-file: integration/go.mod
+          cache: true
+          cache-dependency-path: integration/go.sum
+
+      - name: Build all integration packages
+        run: go -C integration build ./...
+
+      - name: Run go vet on the integration module
+        run: go -C integration vet ./...
+
+      - name: Run integration tests
+        # testcontainers launches PostgreSQL through the runner's Docker daemon.
+        run: go -C integration test ./... -count=1

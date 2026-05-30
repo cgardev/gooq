@@ -1,0 +1,48 @@
+---
+title: gooq
+description: A type-safe, fluent, zero-dependency SQL query builder for Go inspired by jOOQ.
+template: splash
+hero:
+  tagline: A type-safe, fluent, zero-dependency SQL query builder for Go inspired by jOOQ.
+  image:
+    file: ../../assets/sql-file.png
+    alt: gooq
+  actions:
+    - text: Get Started
+      link: /getting-started/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/cgardev/gooq
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Why gooq
+
+<CardGrid stagger>
+	<Card title="Typed columns" icon="seti:go">
+		`Field[T]` columns make comparisons type-checked at compile time: a
+		`Field[int64]` only compares against an `int64`.
+	</Card>
+	<Card title="Typed rows" icon="list-format">
+		Positional `RecordN` row types preserve each projected column's Go type by
+		position, with no reflection at the call site.
+	</Card>
+	<Card title="Compile-time clause order" icon="approve-check">
+		Step interfaces turn the SQL clause order into a type concern: an invalid
+		order does not compile.
+	</Card>
+	<Card title="Many dialects, one AST" icon="random">
+		A single query renders to PostgreSQL, MySQL, or SQLite at execution time.
+	</Card>
+	<Card title="Live code generation" icon="seti:db">
+		Generate typed table accessors directly from a database by introspecting
+		`information_schema`.
+	</Card>
+	<Card title="Zero dependencies" icon="seti:lock">
+		The core library uses only the Go standard library.
+	</Card>
+</CardGrid>
