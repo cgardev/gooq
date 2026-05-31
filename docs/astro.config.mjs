@@ -1,6 +1,7 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import { ion } from 'starlight-ion-theme';
 
 // https://astro.build/config
 export default defineConfig({
@@ -14,6 +15,11 @@ export default defineConfig({
 			title: 'gooq',
 			description:
 				'A type-safe, fluent, zero-dependency SQL query builder for Go inspired by jOOQ.',
+			// Apply the Ion theme, recolored with the OpenAI monochrome article
+			// palette defined in ./src/styles/openai.css. useCustomECTheme:false lets
+			// code blocks follow the same palette instead of Ion's built-in theme.
+			plugins: [ion({ useCustomECTheme: false })],
+			customCss: ['./src/styles/openai.css'],
 			// The header logo and the browser tab icon both use the SQL file
 			// artwork. The logo is resolved relative to the project root, while the
 			// favicon is served from the public directory.
