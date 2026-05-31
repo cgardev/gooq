@@ -23,7 +23,14 @@ export default defineConfig({
 			// at build time so language models can consume the documentation. It
 			// reads the Astro base path, so the files are served under /gooq.
 			plugins: [
-				ion({ useCustomECTheme: false }),
+				ion({
+					useCustomECTheme: false,
+					// Surface the generated llms.txt index in the footer. Ion renders
+					// the href verbatim, so it includes the /gooq base path.
+					footer: {
+						links: [{ label: 'llms.txt', href: '/gooq/llms.txt' }],
+					},
+				}),
 				starlightLlmsTxt({
 					projectName: 'gooq',
 					description:
