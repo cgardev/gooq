@@ -76,3 +76,23 @@
 	--sl-color-text: #0d0d0d;
 	--sl-color-text-accent: #0d0d0d;
 }
+
+/*
+ * Home (splash) page width.
+ *
+ * On the splash template Starlight sets --sl-content-width to 100%, so the hero
+ * and the content below span nearly the full viewport and read as too wide on
+ * large screens. Cap them to a centered column. Scoped to pages with a hero
+ * (data-has-hero, set by Starlight on the splash page), so the regular
+ * documentation pages keep their normal width. The three targets cover every
+ * wrapper the splash layout may use.
+ */
+[data-has-hero] {
+	--sl-content-width: 60rem;
+}
+
+[data-has-hero] .hero,
+[data-has-hero] .sl-container {
+	max-width: 60rem;
+	margin-inline: auto;
+}
