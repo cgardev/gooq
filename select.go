@@ -12,8 +12,13 @@ import (
 // omit WHERE entirely.
 
 // SelectFromStep is the state immediately after the projection is chosen.
+// Distinct may be applied here, before the FROM clause, and returns the same
+// step so the projection can still be followed by From.
 type SelectFromStep[R any] interface {
 	From(t Table) SelectJoinStep[R]
+	// Distinct marks the query as SELECT DISTINCT. It is idempotent and may be
+	// called before From.
+	Distinct() SelectFromStep[R]
 }
 
 // SelectJoinStep allows joining further tables or, by embedding
@@ -179,6 +184,11 @@ func newSelect[R any](projection []node, scan func(*sql.Rows) (R, error)) *selec
 }
 
 func (s *selectBuilder[R]) render(b *builder) { s.stmt.render(b) }
+
+func (s *selectBuilder[R]) Distinct() SelectFromStep[R] {
+	s.stmt.distinct = true
+	return s
+}
 
 func (s *selectBuilder[R]) From(t Table) SelectJoinStep[R] {
 	s.stmt.from = t

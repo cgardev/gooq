@@ -47,6 +47,23 @@ func (p *bindParam) render(b *builder) {
 // bindOf wraps a value as a bind parameter node.
 func bindOf(v any) node { return &bindParam{val: v} }
 
+// exprOf resolves an operand into an expression node. When the value is one of
+// gooq's own field or condition types, its underlying expression node is reused
+// directly, so it renders as an identifier or expression rather than a bound
+// argument. Any other value is wrapped as a bind parameter. This backs the
+// expression-taking operator variants (the *Field methods and Concat) while the
+// value-typed methods keep binding their argument for compile-time type safety.
+func exprOf(v any) node {
+	switch e := v.(type) {
+	case node:
+		// All field and condition types implement node through their embedded
+		// field[T]; reuse the operand's own rendering directly.
+		return e
+	default:
+		return bindOf(v)
+	}
+}
+
 // bindsOf wraps a slice of values as bind parameter nodes.
 func bindsOf[T any](vs []T) []node {
 	out := make([]node, len(vs))
@@ -165,16 +182,22 @@ func (p *likePredicate) render(b *builder) {
 	p.pattern.render(b)
 }
 
-// betweenPredicate renders "operand BETWEEN lo AND hi".
+// betweenPredicate renders "operand BETWEEN lo AND hi", or "operand NOT BETWEEN
+// lo AND hi" when negated.
 type betweenPredicate struct {
 	operand node
 	lo      node
 	hi      node
+	negated bool
 }
 
 func (p *betweenPredicate) render(b *builder) {
 	p.operand.render(b)
-	b.writeString(" BETWEEN ")
+	if p.negated {
+		b.writeString(" NOT BETWEEN ")
+	} else {
+		b.writeString(" BETWEEN ")
+	}
 	p.lo.render(b)
 	b.writeString(" AND ")
 	p.hi.render(b)
@@ -194,6 +217,36 @@ func (e *arithExpr) render(b *builder) {
 	b.writeString(e.op)
 	b.writeString(" ")
 	e.right.render(b)
+	b.writeString(")")
+}
+
+// negExpr renders a unary arithmetic negation "-(operand)". The operand is
+// parenthesized so that negating a compound expression keeps the intended
+// precedence.
+type negExpr struct {
+	operand node
+}
+
+func (e *negExpr) render(b *builder) {
+	b.writeString("-(")
+	e.operand.render(b)
+	b.writeString(")")
+}
+
+// concatExpr renders a parenthesized chain of operands joined by the SQL string
+// concatenation operator "||", which both PostgreSQL and SQLite support.
+type concatExpr struct {
+	parts []node
+}
+
+func (e *concatExpr) render(b *builder) {
+	b.writeString("(")
+	for i, part := range e.parts {
+		if i > 0 {
+			b.writeString(" || ")
+		}
+		part.render(b)
+	}
 	b.writeString(")")
 }
 

@@ -29,9 +29,17 @@ type Field[T any] interface {
 	IsNull() Condition
 	IsNotNull() Condition
 	Between(lo, hi T) Condition
+	NotBetween(lo, hi T) Condition
 
-	// Field-to-field comparison.
+	// Field-to-field comparisons. Each compares this field against another
+	// field or expression, rendering the right operand as an identifier or
+	// expression rather than a bound argument.
 	EQField(other Field[T]) Condition
+	NEField(other Field[T]) Condition
+	GTField(other Field[T]) Condition
+	LTField(other Field[T]) Condition
+	GEField(other Field[T]) Condition
+	LEField(other Field[T]) Condition
 
 	// Aliasing, ordering, and assignment.
 	As(alias string) Field[T]
@@ -83,9 +91,23 @@ func (f field[T]) Between(lo, hi T) Condition {
 	return newCondition(&betweenPredicate{operand: f.expr, lo: bindOf(lo), hi: bindOf(hi)})
 }
 
-func (f field[T]) EQField(other Field[T]) Condition {
-	return newCondition(&binaryPredicate{left: f.expr, op: "=", right: other})
+func (f field[T]) NotBetween(lo, hi T) Condition {
+	return newCondition(&betweenPredicate{operand: f.expr, lo: bindOf(lo), hi: bindOf(hi), negated: true})
 }
+
+// cmpField builds a comparison predicate whose right operand is another field's
+// expression node, so the rendered SQL references the other column or expression
+// directly instead of binding a value.
+func (f field[T]) cmpField(op string, other Field[T]) Condition {
+	return newCondition(&binaryPredicate{left: f.expr, op: op, right: exprOf(other)})
+}
+
+func (f field[T]) EQField(other Field[T]) Condition { return f.cmpField("=", other) }
+func (f field[T]) NEField(other Field[T]) Condition { return f.cmpField("<>", other) }
+func (f field[T]) GTField(other Field[T]) Condition { return f.cmpField(">", other) }
+func (f field[T]) LTField(other Field[T]) Condition { return f.cmpField("<", other) }
+func (f field[T]) GEField(other Field[T]) Condition { return f.cmpField(">=", other) }
+func (f field[T]) LEField(other Field[T]) Condition { return f.cmpField("<=", other) }
 
 func (f field[T]) As(alias string) Field[T] {
 	return field[T]{expr: &aliasNode{inner: f.expr, alias: alias}, name: alias}
