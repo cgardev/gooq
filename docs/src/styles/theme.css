@@ -98,3 +98,13 @@
 	max-width: 60rem;
 	margin-inline: auto;
 }
+
+/*
+ * The landing page disables the edit link and prev/next pagination in its
+ * frontmatter, which leaves an empty page footer whose top border still spans
+ * the full width. Hide that empty footer on hero pages so nothing stretches
+ * edge-to-edge below the content.
+ */
+[data-has-hero] .content-panel > footer {
+	display: none;
+}
