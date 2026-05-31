@@ -29,5 +29,16 @@ func newBookTable(alias string) *bookTable {
 // As returns the table under an alias, with every column re-qualified.
 func (t *bookTable) As(alias string) *bookTable { return newBookTable(alias) }
 
+// PrimaryKey returns the primary key column names in key order.
+func (t *bookTable) PrimaryKey() []string { return nil }
+
+// Uniques returns each unique constraint as its ordered column names.
+func (t *bookTable) Uniques() [][]string { return nil }
+
+// ForeignKeys returns the foreign key constraints declared on the table.
+func (t *bookTable) ForeignKeys() []gooq.ForeignKeyMeta {
+	return []gooq.ForeignKeyMeta{}
+}
+
 // Book is the package-level accessor for the "book" table.
 var Book = newBookTable("")

@@ -26,6 +26,10 @@ type Field[T any] interface {
 	// Set membership, nullability, and range.
 	In(vs ...T) Condition
 	NotIn(vs ...T) Condition
+	// InSubquery renders "x IN (SELECT ...)" against the given subquery.
+	InSubquery(sub Subquery) Condition
+	// NotInSubquery renders "x NOT IN (SELECT ...)" against the given subquery.
+	NotInSubquery(sub Subquery) Condition
 	IsNull() Condition
 	IsNotNull() Condition
 	Between(lo, hi T) Condition
@@ -77,6 +81,14 @@ func (f field[T]) In(vs ...T) Condition {
 
 func (f field[T]) NotIn(vs ...T) Condition {
 	return newCondition(&inPredicate{operand: f.expr, vals: bindsOf(vs), negated: true})
+}
+
+func (f field[T]) InSubquery(sub Subquery) Condition {
+	return newCondition(&inSubqueryPredicate{operand: f.expr, sub: sub})
+}
+
+func (f field[T]) NotInSubquery(sub Subquery) Condition {
+	return newCondition(&inSubqueryPredicate{operand: f.expr, sub: sub, negated: true})
 }
 
 func (f field[T]) IsNull() Condition {

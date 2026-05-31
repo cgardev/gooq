@@ -29,11 +29,21 @@ type Dialect interface {
 	// bound may be nil; implementations handle the offset-without-limit case.
 	renderLimit(b *builder, limit, offset *int64)
 
+	// renderLock writes the dialect-specific row-locking fragment, rendered after
+	// LIMIT and OFFSET. mode is the locking strength ("FOR UPDATE" or
+	// "FOR SHARE") or the empty string when no lock was requested; skipLocked
+	// requests SKIP LOCKED. SQLite has no locking clause and omits this fragment.
+	renderLock(b *builder, mode string, skipLocked bool)
+
 	// boolLiteral renders a boolean constant.
 	boolLiteral(v bool) string
 
 	// supportsReturning reports whether a RETURNING clause can be rendered.
 	supportsReturning() bool
+
+	// supportsDeleteUsing reports whether a DELETE ... USING clause can be
+	// rendered. PostgreSQL supports it; SQLite does not.
+	supportsDeleteUsing() bool
 
 	// renderUpsert writes the conflict-resolution tail of an INSERT statement,
 	// covering everything from ON CONFLICT onward.
@@ -84,6 +94,7 @@ func (postgres) Name() string                    { return "postgres" }
 func (postgres) quoteIdentifier(p string) string { return quoteWith(p, '"') }
 func (postgres) placeholder(n int) string        { return "$" + strconv.Itoa(n) }
 func (postgres) supportsReturning() bool         { return true }
+func (postgres) supportsDeleteUsing() bool       { return true }
 
 func (postgres) boolLiteral(v bool) string {
 	if v {
@@ -94,6 +105,18 @@ func (postgres) boolLiteral(v bool) string {
 
 func (postgres) renderLimit(b *builder, limit, offset *int64) {
 	renderLimitOffset(b, limit, offset, "")
+}
+
+// renderLock writes the PostgreSQL row-locking clause after LIMIT and OFFSET.
+func (postgres) renderLock(b *builder, mode string, skipLocked bool) {
+	if mode == "" {
+		return
+	}
+	b.writeString(" ")
+	b.writeString(mode)
+	if skipLocked {
+		b.writeString(" SKIP LOCKED")
+	}
 }
 
 func (postgres) excludedRef(b *builder, column string) {
@@ -111,6 +134,7 @@ func (sqlite) Name() string                    { return "sqlite" }
 func (sqlite) quoteIdentifier(p string) string { return quoteWith(p, '"') }
 func (sqlite) placeholder(int) string          { return "?" }
 func (sqlite) supportsReturning() bool         { return true }
+func (sqlite) supportsDeleteUsing() bool       { return false }
 func (sqlite) boolLiteral(v bool) string {
 	if v {
 		return "1"
@@ -122,6 +146,10 @@ func (sqlite) renderLimit(b *builder, limit, offset *int64) {
 	// SQLite requires a LIMIT before OFFSET; -1 means "no limit".
 	renderLimitOffset(b, limit, offset, "-1")
 }
+
+// renderLock writes nothing: SQLite has no row-locking clause, so FOR UPDATE and
+// FOR SHARE are silently omitted for this dialect.
+func (sqlite) renderLock(b *builder, mode string, skipLocked bool) {}
 
 func (sqlite) excludedRef(b *builder, column string) {
 	b.writeString("excluded.")

@@ -8,12 +8,18 @@ import (
 )
 
 func TestIntrospectGroupsColumnsByTable(t *testing.T) {
-	fakeInfoSchemaRows = [][]driver.Value{
-		{"author", "id", "integer", "NO"},
-		{"author", "name", "text", "YES"},
-		{"book", "id", "integer", "NO"},
-		{"book", "title", "text", "NO"},
-		{"book", "price", "numeric(10,2)", "YES"},
+	activeCatalog = fakeCatalog{
+		relations: [][]driver.Value{
+			{"author", "BASE TABLE"},
+			{"book", "BASE TABLE"},
+		},
+		columns: [][]driver.Value{
+			{"author", "id", "integer", "NO", "int4"},
+			{"author", "name", "text", "YES", "text"},
+			{"book", "id", "integer", "NO", "int4"},
+			{"book", "title", "text", "NO", "text"},
+			{"book", "price", "numeric", "YES", "numeric"},
+		},
 	}
 
 	db, err := sql.Open("gooqgenfake", "")
@@ -31,7 +37,7 @@ func TestIntrospectGroupsColumnsByTable(t *testing.T) {
 		t.Fatalf("got %d tables, want 2", len(tables))
 	}
 
-	// Grouping and table order are preserved from the row order.
+	// Grouping and table order are preserved from the relation order.
 	if tables[0].Name != "author" || tables[1].Name != "book" {
 		t.Fatalf("table names = %q, %q", tables[0].Name, tables[1].Name)
 	}
@@ -57,7 +63,7 @@ func TestIntrospectGroupsColumnsByTable(t *testing.T) {
 	}{
 		{"id", "integer", false},
 		{"title", "text", false},
-		{"price", "numeric(10,2)", true},
+		{"price", "numeric", true},
 	}
 	if len(book.Columns) != len(wantBook) {
 		t.Fatalf("book columns = %d, want %d", len(book.Columns), len(wantBook))
@@ -67,6 +73,116 @@ func TestIntrospectGroupsColumnsByTable(t *testing.T) {
 		if got.Name != w.name || got.DataType != w.dataType || got.Nullable != w.nullable {
 			t.Errorf("book column %d = %+v, want %v", i, got, w)
 		}
+	}
+}
+
+// TestIntrospectKeyMetadata verifies that primary key, unique, and foreign key
+// metadata are grouped onto the correct tables in a deterministic order, that
+// enum columns resolve their labels, and that views carry only columns.
+func TestIntrospectKeyMetadata(t *testing.T) {
+	activeCatalog = fakeCatalog{
+		relations: [][]driver.Value{
+			{"author", "BASE TABLE"},
+			{"book", "BASE TABLE"},
+			{"book_summary", "VIEW"},
+		},
+		columns: [][]driver.Value{
+			{"author", "id", "integer", "NO", "int4"},
+			{"author", "email", "text", "NO", "text"},
+			{"book", "id", "integer", "NO", "int4"},
+			{"book", "author_id", "integer", "NO", "int4"},
+			{"book", "status", "USER-DEFINED", "NO", "book_status"},
+			{"book_summary", "title", "text", "YES", "text"},
+		},
+		enums: [][]driver.Value{
+			{"book_status", "draft"},
+			{"book_status", "published"},
+			{"book_status", "archived"},
+		},
+		primaryKeys: [][]driver.Value{
+			{"author", "id"},
+			{"book", "id"},
+		},
+		uniques: [][]driver.Value{
+			{"author", "author_email_key", "email"},
+		},
+		foreignKeys: [][]driver.Value{
+			{"book", "book_author_id_fkey", "author_id", "author", "id"},
+		},
+	}
+
+	db, err := sql.Open("gooqgenfake", "")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.Close()
+
+	tables, err := Introspect(context.Background(), db, "public")
+	if err != nil {
+		t.Fatalf("Introspect: %v", err)
+	}
+	if len(tables) != 3 {
+		t.Fatalf("got %d relations, want 3", len(tables))
+	}
+
+	byName := make(map[string]TableSchema, len(tables))
+	for _, table := range tables {
+		byName[table.Name] = table
+	}
+
+	author := byName["author"]
+	if len(author.PrimaryKey) != 1 || author.PrimaryKey[0] != "id" {
+		t.Errorf("author primary key = %v, want [id]", author.PrimaryKey)
+	}
+	if len(author.Uniques) != 1 || len(author.Uniques[0]) != 1 || author.Uniques[0][0] != "email" {
+		t.Errorf("author uniques = %v, want [[email]]", author.Uniques)
+	}
+
+	book := byName["book"]
+	if len(book.ForeignKeys) != 1 {
+		t.Fatalf("book foreign keys = %v, want one", book.ForeignKeys)
+	}
+	fk := book.ForeignKeys[0]
+	if fk.Name != "book_author_id_fkey" || fk.RefTable != "author" {
+		t.Errorf("book foreign key = %+v", fk)
+	}
+	if len(fk.Columns) != 1 || fk.Columns[0] != "author_id" {
+		t.Errorf("book foreign key columns = %v, want [author_id]", fk.Columns)
+	}
+	if len(fk.RefColumns) != 1 || fk.RefColumns[0] != "id" {
+		t.Errorf("book foreign key ref columns = %v, want [id]", fk.RefColumns)
+	}
+
+	// The enum column resolves its type and labels.
+	var status Column
+	for _, c := range book.Columns {
+		if c.Name == "status" {
+			status = c
+		}
+	}
+	if status.EnumType != "book_status" {
+		t.Errorf("status enum type = %q, want book_status", status.EnumType)
+	}
+	wantLabels := []string{"draft", "published", "archived"}
+	if len(status.EnumLabels) != len(wantLabels) {
+		t.Fatalf("status enum labels = %v, want %v", status.EnumLabels, wantLabels)
+	}
+	for i, want := range wantLabels {
+		if status.EnumLabels[i] != want {
+			t.Errorf("status enum label %d = %q, want %q", i, status.EnumLabels[i], want)
+		}
+	}
+
+	// The view carries columns but no key metadata.
+	view := byName["book_summary"]
+	if !view.IsView {
+		t.Errorf("book_summary IsView = false, want true")
+	}
+	if len(view.PrimaryKey) != 0 || len(view.Uniques) != 0 || len(view.ForeignKeys) != 0 {
+		t.Errorf("view %q unexpectedly carries key metadata", view.Name)
+	}
+	if len(view.Columns) != 1 || view.Columns[0].Name != "title" {
+		t.Errorf("view columns = %v, want [title]", view.Columns)
 	}
 }
 
@@ -109,19 +225,19 @@ func TestMapSQLType(t *testing.T) {
 		{"json", true, "gooq.Field[[]byte]", "gooq.NewField[[]byte]", nil},
 	}
 	for _, tc := range tests {
-		got := mapSQLType(tc.dataType, tc.nullable)
+		got := mapColumn(Column{DataType: tc.dataType, Nullable: tc.nullable}, nil)
 		if got.fieldType != tc.fieldType {
-			t.Errorf("mapSQLType(%q, %t) fieldType = %q, want %q", tc.dataType, tc.nullable, got.fieldType, tc.fieldType)
+			t.Errorf("mapColumn(%q, %t) fieldType = %q, want %q", tc.dataType, tc.nullable, got.fieldType, tc.fieldType)
 		}
 		if got.constructor != tc.constructor {
-			t.Errorf("mapSQLType(%q, %t) constructor = %q, want %q", tc.dataType, tc.nullable, got.constructor, tc.constructor)
+			t.Errorf("mapColumn(%q, %t) constructor = %q, want %q", tc.dataType, tc.nullable, got.constructor, tc.constructor)
 		}
 		if len(got.imports) != len(tc.imports) {
-			t.Fatalf("mapSQLType(%q, %t) imports = %v, want %v", tc.dataType, tc.nullable, got.imports, tc.imports)
+			t.Fatalf("mapColumn(%q, %t) imports = %v, want %v", tc.dataType, tc.nullable, got.imports, tc.imports)
 		}
 		for i := range tc.imports {
 			if got.imports[i] != tc.imports[i] {
-				t.Errorf("mapSQLType(%q, %t) import %d = %q, want %q", tc.dataType, tc.nullable, i, got.imports[i], tc.imports[i])
+				t.Errorf("mapColumn(%q, %t) import %d = %q, want %q", tc.dataType, tc.nullable, i, got.imports[i], tc.imports[i])
 			}
 		}
 	}

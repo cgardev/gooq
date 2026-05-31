@@ -20,6 +20,7 @@ type bookTable struct {
 	Price       gooq.NumericField[float64]
 	PageCount   gooq.NumericField[int64]
 	InPrint     gooq.Field[bool]
+	Status      gooq.Field[BookStatus]
 	Attributes  gooq.Field[json.RawMessage]
 	PublishedAt gooq.Field[sql.Null[time.Time]]
 	CreatedAt   gooq.Field[time.Time]
@@ -37,6 +38,7 @@ func newBookTable(alias string) *bookTable {
 		Price:       gooq.NewNumericField[float64](base, "price"),
 		PageCount:   gooq.NewNumericField[int64](base, "page_count"),
 		InPrint:     gooq.NewField[bool](base, "in_print"),
+		Status:      gooq.NewField[BookStatus](base, "status"),
 		Attributes:  gooq.NewField[json.RawMessage](base, "attributes"),
 		PublishedAt: gooq.NewField[sql.Null[time.Time]](base, "published_at"),
 		CreatedAt:   gooq.NewField[time.Time](base, "created_at"),
@@ -45,6 +47,20 @@ func newBookTable(alias string) *bookTable {
 
 // As returns the table under an alias, with every column re-qualified.
 func (t *bookTable) As(alias string) *bookTable { return newBookTable(alias) }
+
+// PrimaryKey returns the primary key column names in key order.
+func (t *bookTable) PrimaryKey() []string { return []string{"id"} }
+
+// Uniques returns each unique constraint as its ordered column names.
+func (t *bookTable) Uniques() [][]string { return nil }
+
+// ForeignKeys returns the foreign key constraints declared on the table.
+func (t *bookTable) ForeignKeys() []gooq.ForeignKeyMeta {
+	return []gooq.ForeignKeyMeta{
+		{Name: "book_author_id_fkey", Columns: []string{"author_id"}, RefTable: "author", RefColumns: []string{"id"}},
+		{Name: "book_editor_id_fkey", Columns: []string{"editor_id"}, RefTable: "author", RefColumns: []string{"id"}},
+	}
+}
 
 // Book is the package-level accessor for the "book" table.
 var Book = newBookTable("")

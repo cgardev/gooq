@@ -138,15 +138,27 @@ func mappingFor(dataType string) typeMapping {
 	}
 }
 
-// mapSQLType maps a SQL data type and nullability flag onto a goMapping.
-//
-// Non-nullable columns use the refined field types (NumericField, StringField,
-// or a typed Field). Nullable columns whose element type is a scalar wrap that
-// element in the generic sql.Null type and fall back to a plain Field, because
-// the refined field types provide no nullable variant. Byte slices and JSON raw
-// messages already scan NULL as nil and are therefore left unwrapped.
-func mapSQLType(dataType string, nullable bool) goMapping {
-	mapping := mappingFor(dataType)
+// mappingForElement builds the non-nullable and nullable mappings for an
+// arbitrary Go element type named by goType, requiring the provided imports. It
+// is used for enum columns (a named string element) and for type overrides (an
+// element such as uuid.UUID). The element is wrapped in the generic Field type
+// and, when nullable, in sql.Null. A blank import is ignored.
+func mappingForElement(goType string, imports []string) typeMapping {
+	nonNullableImports := append([]string(nil), imports...)
+	return typeMapping{
+		nonNullable: goMapping{
+			fieldType:   "gooq.Field[" + goType + "]",
+			constructor: "gooq.NewField[" + goType + "]",
+			imports:     nonNullableImports,
+		},
+		element:        goType,
+		elementImports: append([]string(nil), imports...),
+	}
+}
+
+// mapTypeMapping maps a typeMapping and nullability flag onto a concrete
+// goMapping, applying the nullable wrapping rules described on typeMapping.
+func mapTypeMapping(mapping typeMapping, nullable bool) goMapping {
 	if !nullable {
 		return mapping.nonNullable
 	}
@@ -164,4 +176,16 @@ func mapSQLType(dataType string, nullable bool) goMapping {
 		constructor: "gooq.NewField[" + wrapped + "]",
 		imports:     imports,
 	}
+}
+
+// mapColumn maps a column onto a goMapping, applying any override first and
+// otherwise dispatching on the column's data type. The override, when non-nil,
+// supplies the Go element type (and optional import) to wrap in Field, taking
+// precedence over the catalog type. Enum columns are handled by the emitter and
+// are not resolved here.
+func mapColumn(col Column, override *goMapping) goMapping {
+	if override != nil {
+		return mapTypeMapping(mappingForElement(override.fieldType, override.imports), col.Nullable)
+	}
+	return mapTypeMapping(mappingFor(col.DataType), col.Nullable)
 }

@@ -9,8 +9,12 @@ import (
 type updateStmt struct {
 	tableName   string
 	assignments []node
-	where       node
-	returning   *returningClause
+	// fromTable, when set, names a further table joined into the UPDATE through a
+	// FROM clause ("UPDATE t SET ... FROM other WHERE ..."). PostgreSQL and
+	// recent SQLite both support UPDATE ... FROM.
+	fromTable string
+	where     node
+	returning *returningClause
 }
 
 func (s *updateStmt) render(b *builder) {
@@ -18,6 +22,10 @@ func (s *updateStmt) render(b *builder) {
 	b.writeIdentifier(s.tableName)
 	b.writeString(" SET ")
 	renderList(b, s.assignments)
+	if s.fromTable != "" {
+		b.writeString(" FROM ")
+		b.writeIdentifier(s.fromTable)
+	}
 	if s.where != nil {
 		b.writeString(" WHERE ")
 		s.where.render(b)
@@ -32,10 +40,14 @@ type UpdateSetStep interface {
 	Set(a Assignment) UpdateSetMoreStep
 }
 
-// UpdateSetMoreStep accepts further assignments or a WHERE clause.
+// UpdateSetMoreStep accepts further assignments, a FROM clause, or a WHERE
+// clause.
 type UpdateSetMoreStep interface {
 	UpdateWhereStep
 	Set(a Assignment) UpdateSetMoreStep
+	// From joins a further table into the UPDATE through a FROM clause, rendered
+	// before WHERE. Supported by PostgreSQL and recent SQLite.
+	From(t Table) UpdateWhereStep
 }
 
 // UpdateWhereStep allows a WHERE clause or terminal execution.
@@ -84,6 +96,11 @@ func (b *updateBuilder) render(bld *builder) { b.stmt.render(bld) }
 
 func (b *updateBuilder) Set(a Assignment) UpdateSetMoreStep {
 	b.stmt.assignments = append(b.stmt.assignments, a)
+	return b
+}
+
+func (b *updateBuilder) From(t Table) UpdateWhereStep {
+	b.stmt.fromTable = t.TableName()
 	return b
 }
 

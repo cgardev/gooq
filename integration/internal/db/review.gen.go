@@ -35,5 +35,18 @@ func newReviewTable(alias string) *reviewTable {
 // As returns the table under an alias, with every column re-qualified.
 func (t *reviewTable) As(alias string) *reviewTable { return newReviewTable(alias) }
 
+// PrimaryKey returns the primary key column names in key order.
+func (t *reviewTable) PrimaryKey() []string { return []string{"id"} }
+
+// Uniques returns each unique constraint as its ordered column names.
+func (t *reviewTable) Uniques() [][]string { return nil }
+
+// ForeignKeys returns the foreign key constraints declared on the table.
+func (t *reviewTable) ForeignKeys() []gooq.ForeignKeyMeta {
+	return []gooq.ForeignKeyMeta{
+		{Name: "review_book_id_fkey", Columns: []string{"book_id"}, RefTable: "book", RefColumns: []string{"id"}},
+	}
+}
+
 // Review is the package-level accessor for the "review" table.
 var Review = newReviewTable("")

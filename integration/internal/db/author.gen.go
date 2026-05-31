@@ -32,5 +32,16 @@ func newAuthorTable(alias string) *authorTable {
 // As returns the table under an alias, with every column re-qualified.
 func (t *authorTable) As(alias string) *authorTable { return newAuthorTable(alias) }
 
+// PrimaryKey returns the primary key column names in key order.
+func (t *authorTable) PrimaryKey() []string { return []string{"id"} }
+
+// Uniques returns each unique constraint as its ordered column names.
+func (t *authorTable) Uniques() [][]string { return [][]string{{"email"}} }
+
+// ForeignKeys returns the foreign key constraints declared on the table.
+func (t *authorTable) ForeignKeys() []gooq.ForeignKeyMeta {
+	return []gooq.ForeignKeyMeta{}
+}
+
 // Author is the package-level accessor for the "author" table.
 var Author = newAuthorTable("")

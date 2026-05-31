@@ -13,8 +13,11 @@ import (
 
 // SelectFromStep is the state immediately after the projection is chosen.
 // Distinct may be applied here, before the FROM clause, and returns the same
-// step so the projection can still be followed by From.
+// step so the projection can still be followed by From. It embeds Subquery so a
+// SELECT may be used as a sub-expression (EXISTS, IN, or scalar) at any point in
+// its construction.
 type SelectFromStep[R any] interface {
+	Subquery
 	From(t Table) SelectJoinStep[R]
 	// Distinct marks the query as SELECT DISTINCT. It is idempotent and may be
 	// called before From.
@@ -68,18 +71,35 @@ type SelectOrderByStep[R any] interface {
 	OrderBy(orders ...OrderField) SelectLimitStep[R]
 }
 
-// SelectLimitStep allows a LIMIT and/or OFFSET clause or terminal execution.
-// Both Limit and Offset return SelectLimitStep so they may be chained in either
-// order or used independently (a bare OFFSET is legal).
+// SelectLimitStep allows a LIMIT and/or OFFSET clause, a row-locking clause, or
+// terminal execution. Both Limit and Offset return SelectLimitStep so they may
+// be chained in either order or used independently (a bare OFFSET is legal).
 type SelectLimitStep[R any] interface {
-	SelectFinalStep[R]
+	SelectLockStep[R]
 	Limit(n int64) SelectLimitStep[R]
 	Offset(n int64) SelectLimitStep[R]
 }
 
+// SelectLockStep allows a row-locking clause (FOR UPDATE / FOR SHARE, optionally
+// SKIP LOCKED) after ORDER BY, LIMIT, and OFFSET, or terminal execution. The
+// locking clause is rendered for PostgreSQL and silently omitted for SQLite,
+// which has no such clause.
+type SelectLockStep[R any] interface {
+	SelectFinalStep[R]
+	// ForUpdate adds a FOR UPDATE locking clause to the query.
+	ForUpdate() SelectLockStep[R]
+	// ForShare adds a FOR SHARE locking clause to the query.
+	ForShare() SelectLockStep[R]
+	// SkipLocked appends SKIP LOCKED to the locking clause, so locked rows are
+	// skipped rather than waited on. It is meaningful only after ForUpdate or
+	// ForShare.
+	SkipLocked() SelectLockStep[R]
+}
+
 // SelectFinalStep is the terminal state: render the SQL or execute the query.
+// It embeds Subquery so a fully built SELECT can also serve as a sub-expression.
 type SelectFinalStep[R any] interface {
-	node
+	Subquery
 	// Fetch executes the query and returns every row mapped to R.
 	Fetch(ctx context.Context, db Querier) ([]R, error)
 	// FetchOne returns the single row, the zero value when no row matches, or
@@ -98,6 +118,19 @@ type SelectFinalStep[R any] interface {
 	SQLFor(d Dialect) (string, []any, error)
 	// Using selects the dialect used by SQL, Fetch, FetchOne, and FetchSingle.
 	Using(d Dialect) SelectFinalStep[R]
+
+	// Union combines this query with another over the same row type, removing
+	// duplicate rows.
+	Union(other SelectFinalStep[R]) SelectFinalStep[R]
+	// UnionAll combines this query with another over the same row type, keeping
+	// duplicate rows.
+	UnionAll(other SelectFinalStep[R]) SelectFinalStep[R]
+	// Intersect returns the rows common to this query and another over the same
+	// row type.
+	Intersect(other SelectFinalStep[R]) SelectFinalStep[R]
+	// Except returns the rows of this query that do not appear in another over
+	// the same row type.
+	Except(other SelectFinalStep[R]) SelectFinalStep[R]
 }
 
 // selectStmt is the SELECT abstract syntax tree node.
@@ -112,6 +145,12 @@ type selectStmt struct {
 	orderBy    []node
 	limit      *int64
 	offset     *int64
+	// lockMode holds the row-locking strength ("FOR UPDATE" or "FOR SHARE"), or
+	// the empty string when no locking clause is requested. skipLocked appends
+	// SKIP LOCKED. Both are rendered through the dialect, which omits them for
+	// SQLite.
+	lockMode   string
+	skipLocked bool
 }
 
 func (s *selectStmt) render(b *builder) {
@@ -147,6 +186,7 @@ func (s *selectStmt) render(b *builder) {
 		renderList(b, s.orderBy)
 	}
 	b.dialect.renderLimit(b, s.limit, s.offset)
+	b.dialect.renderLock(b, s.lockMode, s.skipLocked)
 }
 
 // joinClause is a single JOIN node.
@@ -171,8 +211,14 @@ func (j *joinClause) render(b *builder) {
 // chain. Methods mutate the underlying statement and return the receiver typed
 // as the next legal step. The scan closure, captured by the generic SelectN
 // constructor, maps a result row to R.
+//
+// A selectBuilder may instead carry a set-operation node, produced by Union and
+// its siblings. When set, the statement renders that combined query rather than
+// a plain SELECT, while the captured scan closure still maps each merged row
+// to R.
 type selectBuilder[R any] struct {
 	stmt        *selectStmt
+	setOp       *setOpStmt
 	scan        func(*sql.Rows) (R, error)
 	dialect     Dialect
 	pendingJoin *joinClause
@@ -186,7 +232,16 @@ func newSelect[R any](projection []node, scan func(*sql.Rows) (R, error)) *selec
 	}
 }
 
-func (s *selectBuilder[R]) render(b *builder) { s.stmt.render(b) }
+// queryNode returns the node this builder renders: the set-operation node when
+// present, otherwise the plain SELECT statement.
+func (s *selectBuilder[R]) queryNode() node {
+	if s.setOp != nil {
+		return s.setOp
+	}
+	return s.stmt
+}
+
+func (s *selectBuilder[R]) render(b *builder) { s.queryNode().render(b) }
 
 func (s *selectBuilder[R]) Distinct() SelectFromStep[R] {
 	s.stmt.distinct = true
@@ -272,7 +327,7 @@ func (s *selectBuilder[R]) SQL() (string, []any, error) {
 
 func (s *selectBuilder[R]) SQLFor(d Dialect) (string, []any, error) {
 	b := newBuilder(d)
-	s.stmt.render(b)
+	s.queryNode().render(b)
 	return b.result()
 }
 

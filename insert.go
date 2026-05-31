@@ -54,8 +54,12 @@ type insertStmt struct {
 	columns       []string
 	rows          [][]node
 	defaultValues bool
-	upsert        *upsertClause
-	returning     *returningClause
+	// source, when set, supplies the inserted rows from a SELECT statement
+	// ("INSERT INTO t (cols) SELECT ..."), rendered into the same builder as the
+	// outer statement so placeholder numbering stays correct.
+	source    Subquery
+	upsert    *upsertClause
+	returning *returningClause
 }
 
 func (s *insertStmt) render(b *builder) {
@@ -68,19 +72,28 @@ func (s *insertStmt) render(b *builder) {
 		return
 	}
 
+	if s.source != nil {
+		if len(s.columns) == 0 {
+			b.setError(ErrEmptyInsert)
+			return
+		}
+		s.renderColumns(b)
+		b.writeString(" ")
+		// Render the source SELECT into the same builder so its bind arguments
+		// interleave with the outer statement in render order, keeping the
+		// PostgreSQL $N placeholder numbering correct.
+		s.source.(node).render(b)
+		s.renderTail(b)
+		return
+	}
+
 	if len(s.columns) == 0 || len(s.rows) == 0 {
 		b.setError(ErrEmptyInsert)
 		return
 	}
 
-	b.writeString(" (")
-	for i, c := range s.columns {
-		if i > 0 {
-			b.writeString(", ")
-		}
-		b.writeIdentifier(c)
-	}
-	b.writeString(") VALUES ")
+	s.renderColumns(b)
+	b.writeString(" VALUES ")
 
 	for ri, row := range s.rows {
 		if len(row) != len(s.columns) {
@@ -96,6 +109,19 @@ func (s *insertStmt) render(b *builder) {
 	}
 
 	s.renderTail(b)
+}
+
+// renderColumns writes the parenthesized column list, prefixed with a single
+// leading space: " (col1, col2, ...)".
+func (s *insertStmt) renderColumns(b *builder) {
+	b.writeString(" (")
+	for i, c := range s.columns {
+		if i > 0 {
+			b.writeString(", ")
+		}
+		b.writeIdentifier(c)
+	}
+	b.writeString(")")
 }
 
 func (s *insertStmt) renderTail(b *builder) {
@@ -114,10 +140,15 @@ type InsertSetStep interface {
 	DefaultValues() InsertFinalStep
 }
 
-// InsertValuesStep accepts one or more value rows.
+// InsertValuesStep accepts one or more value rows, or a SELECT statement whose
+// rows are inserted ("INSERT INTO t (cols) SELECT ...").
 type InsertValuesStep interface {
 	InsertOnConflictStep
 	Values(values ...any) InsertValuesStep
+	// Select supplies the inserted rows from a subquery rather than literal
+	// value rows. The source SELECT is rendered into the same builder as the
+	// INSERT, so its bind arguments interleave correctly.
+	Select(sub Subquery) InsertReturningStep
 }
 
 // InsertSetMoreStep accepts further column assignments.
@@ -184,6 +215,11 @@ func (b *insertBuilder) Values(values ...any) InsertValuesStep {
 		row[i] = bindOf(v)
 	}
 	b.stmt.rows = append(b.stmt.rows, row)
+	return b
+}
+
+func (b *insertBuilder) Select(sub Subquery) InsertReturningStep {
+	b.stmt.source = sub
 	return b
 }
 
