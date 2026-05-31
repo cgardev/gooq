@@ -83,8 +83,9 @@
  * On the splash template Starlight stretches the content to the full viewport,
  * which reads as too wide on large screens. The splash .sl-container carries
  * max-width: 100% !important, so it cannot be narrowed cleanly; instead each
- * content block is capped to a centered column directly: the hero, the markdown
- * body, and the page footer (which holds the prev/next pagination). Scoped to
+ * content block is capped to a centered column directly: the hero and the
+ * markdown body. (The landing page disables the edit link and prev/next
+ * pagination in its frontmatter, so there is no footer to constrain.) Scoped to
  * pages with a hero (data-has-hero, set by Starlight on the splash page), so the
  * documentation pages keep their normal width.
  */
@@ -93,8 +94,7 @@
 }
 
 [data-has-hero] .hero,
-[data-has-hero] .sl-markdown-content,
-[data-has-hero] .page-footer {
+[data-has-hero] .sl-markdown-content {
 	max-width: 60rem;
 	margin-inline: auto;
 }
