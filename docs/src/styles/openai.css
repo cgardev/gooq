@@ -92,7 +92,8 @@
 }
 
 [data-has-hero] .hero,
-[data-has-hero] .sl-container {
+[data-has-hero] .sl-container,
+[data-has-hero] .sl-markdown-content {
 	max-width: 60rem;
 	margin-inline: auto;
 }
