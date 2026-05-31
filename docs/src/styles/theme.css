@@ -1,9 +1,9 @@
 /*
- * OpenAI-article monochrome palette for the Starlight "Ion" theme.
+ * Monochrome palette for the Starlight "Ion" theme.
  *
- * The Ion theme provides the layout and components; this file recolors it to
- * the clean black-and-white look OpenAI uses for its published articles by
- * overriding Starlight's --sl-color-* custom properties, which Ion also reads.
+ * The Ion theme provides the layout and components; this file recolors it to a
+ * clean black-and-white palette by overriding Starlight's --sl-color-* custom
+ * properties, which Ion also reads.
  *
  * Selectors use a doubled :root so these declarations outrank both Starlight's
  * defaults and Ion's stylesheet (which Starlight loads after this file),
@@ -35,7 +35,7 @@
 	--sl-color-accent: #b4b4b4;
 	--sl-color-accent-high: #ffffff;
 
-	/* Surfaces and borders, matching the OpenAI dark article look. */
+	/* Surfaces and borders for the dark scheme. */
 	--sl-color-bg: #0d0d0d;
 	--sl-color-bg-nav: #0d0d0d;
 	--sl-color-bg-sidebar: #0d0d0d;
@@ -65,7 +65,7 @@
 	--sl-color-accent: #676767;
 	--sl-color-accent-high: #0d0d0d;
 
-	/* Surfaces and borders, matching the OpenAI light article look. */
+	/* Surfaces and borders for the light scheme. */
 	--sl-color-bg: #ffffff;
 	--sl-color-bg-nav: #ffffff;
 	--sl-color-bg-sidebar: #ffffff;
