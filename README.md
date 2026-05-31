@@ -1,11 +1,13 @@
 # gooq
 
-A type-safe, fluent, zero-dependency SQL query builder for Go, inspired by [jOOQ](https://www.jooq.org/). `gooq` gives you parametric `Field[T]` columns whose comparison methods reject mismatched types at compile time, positional `RecordN` row types that preserve each projected column's Go type by position, step interfaces that turn clause order into a compile-time concern (you cannot place `WHERE` after `GROUP BY`, but you may omit it entirely), and runtime dialect translation: a query is built once as a detached abstract syntax tree and rendered to dialect-specific SQL for PostgreSQL and SQLite at execution time.
-
 [![Go Reference](https://pkg.go.dev/badge/github.com/cgardev/gooq.svg)](https://pkg.go.dev/github.com/cgardev/gooq)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![CI](https://img.shields.io/github/actions/workflow/status/cgardev/gooq/ci.yml?branch=main&label=CI)](https://github.com/cgardev/gooq/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/cgardev/gooq)](https://goreportcard.com/report/github.com/cgardev/gooq)
+[![CI](https://github.com/cgardev/gooq/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/cgardev/gooq/actions/workflows/ci.yml)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/cgardev/gooq)](go.mod)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)](#status-and-roadmap)
+
+A type-safe, fluent, zero-dependency SQL query builder for Go, inspired by [jOOQ](https://www.jooq.org/). `gooq` gives you parametric `Field[T]` columns whose comparison methods reject mismatched types at compile time, positional `RecordN` row types that preserve each projected column's Go type by position, step interfaces that turn clause order into a compile-time concern (you cannot place `WHERE` after `GROUP BY`, but you may omit it entirely), and runtime dialect translation: a query is built once as a detached abstract syntax tree and rendered to dialect-specific SQL for PostgreSQL and SQLite at execution time.
 
 > [!WARNING]
 > **Alpha.** This project is in early, active development. The public API, wire
