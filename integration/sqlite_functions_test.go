@@ -7,15 +7,16 @@ import (
 	"github.com/cgardev/gooq/integration/internal/db"
 )
 
-// phase2_sqlite_test.go exercises the function and expression catalog end to end
-// against a real, pure-Go SQLite database. Each test seeds the standard library
-// fixtures, runs one fluent gooq query bound to the SQLite dialect, and asserts
-// the typed result, mirroring the readable style of the rest of the SQLite suite.
+// sqlite_functions_test.go exercises the function and expression catalog end to
+// end against a real, pure-Go SQLite database. Each test seeds the standard
+// library fixtures, runs one fluent gooq query bound to the SQLite dialect, and
+// asserts the typed result, mirroring the readable style of the rest of the
+// SQLite suite.
 
-// TestPhase2AggregateGroupByHaving verifies that aggregates compose with GROUP BY
+// TestSQLiteAggregateGroupByHaving verifies that aggregates compose with GROUP BY
 // and HAVING: it counts and sums the ratings per book, keeping only the books
 // with more than one review, and checks the counts and totals against the seed.
-func TestPhase2AggregateGroupByHaving(t *testing.T) {
+func TestSQLiteAggregateGroupByHaving(t *testing.T) {
 	ctx, conn := sqliteLibrary(t)
 
 	// The seed gives the Go book two reviews (ratings 5 and 4) and every other
@@ -47,11 +48,11 @@ func TestPhase2AggregateGroupByHaving(t *testing.T) {
 	equal(t, "all grouped rows", len(all), 3)
 }
 
-// TestPhase2Coalesce verifies COALESCE on a nullable column: books with a NULL
+// TestSQLiteCoalesce verifies COALESCE on a nullable column: books with a NULL
 // subtitle fall back to the supplied default, while books with a subtitle keep
 // their own value. Because COALESCE never returns NULL here, the result is always
 // a valid sql.Null[string].
-func TestPhase2Coalesce(t *testing.T) {
+func TestSQLiteCoalesce(t *testing.T) {
 	ctx, conn := sqliteLibrary(t)
 
 	// The Go book has the subtitle "An Idiomatic Guide"; the Practice book has a
@@ -77,9 +78,9 @@ func TestPhase2Coalesce(t *testing.T) {
 	equal(t, "default value", withoutSubtitle.V1.V, "no subtitle")
 }
 
-// TestPhase2Case verifies a searched CASE expression classifies each book by its
+// TestSQLiteCase verifies a searched CASE expression classifies each book by its
 // price into a textual bucket, computed entirely in the database.
-func TestPhase2Case(t *testing.T) {
+func TestSQLiteCase(t *testing.T) {
 	ctx, conn := sqliteLibrary(t)
 
 	// Prices in the seed: Go 39.99, Practice 29.50, C 45.00. The thresholds map

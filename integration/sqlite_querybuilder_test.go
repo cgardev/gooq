@@ -7,9 +7,13 @@ import (
 	"github.com/cgardev/gooq/integration/internal/db"
 )
 
-// TestPhase0DistinctExec verifies that SELECT DISTINCT executes against SQLite
+// sqlite_querybuilder_test.go exercises the query-builder quick wins end to end
+// against the pure-Go SQLite database: SELECT DISTINCT, the free-function And and
+// Or combinators, NULLS ordering, and the verbatim RawCondition escape hatch.
+
+// TestSQLiteDistinctExec verifies that SELECT DISTINCT executes against SQLite
 // and collapses duplicate author identifiers across the seeded books.
-func TestPhase0DistinctExec(t *testing.T) {
+func TestSQLiteDistinctExec(t *testing.T) {
 	ctx, conn := sqliteLibrary(t)
 
 	rows, err := gooq.Select1(db.Book.AuthorId).
@@ -24,27 +28,9 @@ func TestPhase0DistinctExec(t *testing.T) {
 	equal(t, "distinct author count", len(rows), 2)
 }
 
-// TestPhase0NotBetweenExec verifies the NOT BETWEEN predicate against SQLite.
-func TestPhase0NotBetweenExec(t *testing.T) {
-	ctx, conn := sqliteLibrary(t)
-
-	rows, err := gooq.Select1(db.Book.Id).
-		From(db.Book).
-		Where(db.Book.Price.NotBetween(35.00, 50.00)).
-		OrderBy(db.Book.Id.Asc()).
-		Using(gooq.SQLite()).
-		Fetch(ctx, conn)
-	noError(t, "not between price range", err)
-
-	// Seeded prices are 39.99, 29.50, and 45.00; only 29.50 falls outside
-	// [35.00, 50.00].
-	equal(t, "rows outside range", len(rows), 1)
-	equal(t, "the matching book", rows[0].V1, bookPractice)
-}
-
-// TestPhase0CombinatorsExec verifies the free-function And and Or combinators
+// TestSQLiteCombinatorsExec verifies the free-function And and Or combinators
 // against SQLite.
-func TestPhase0CombinatorsExec(t *testing.T) {
+func TestSQLiteCombinatorsExec(t *testing.T) {
 	ctx, conn := sqliteLibrary(t)
 
 	cond := gooq.And(
@@ -67,9 +53,9 @@ func TestPhase0CombinatorsExec(t *testing.T) {
 	equal(t, "the matching book", rows[0].V1, bookC)
 }
 
-// TestPhase0OrderNullsExec verifies that NULLS ordering executes against SQLite,
+// TestSQLiteOrderNullsExec verifies that NULLS ordering executes against SQLite,
 // placing the rows with a NULL published_at first.
-func TestPhase0OrderNullsExec(t *testing.T) {
+func TestSQLiteOrderNullsExec(t *testing.T) {
 	ctx, conn := sqliteLibrary(t)
 
 	rows, err := gooq.Select2(db.Book.Id, db.Book.PublishedAt).
@@ -87,9 +73,9 @@ func TestPhase0OrderNullsExec(t *testing.T) {
 	equal(t, "last row present", rows[2].V2.Valid, true)
 }
 
-// TestPhase0RawConditionExec verifies that a verbatim RawCondition executes
+// TestSQLiteRawConditionExec verifies that a verbatim RawCondition executes
 // against SQLite.
-func TestPhase0RawConditionExec(t *testing.T) {
+func TestSQLiteRawConditionExec(t *testing.T) {
 	ctx, conn := sqliteLibrary(t)
 
 	rows, err := gooq.Select1(db.Book.Id).

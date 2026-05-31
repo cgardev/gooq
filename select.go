@@ -88,6 +88,9 @@ type SelectFinalStep[R any] interface {
 	// FetchSingle returns the single row, sql.ErrNoRows when none matches, or
 	// ErrTooManyRows when more than one matches.
 	FetchSingle(ctx context.Context, db Querier) (R, error)
+	// FetchOptional returns the single row and true, the zero value and false
+	// when no row matches, or ErrTooManyRows when more than one row matches.
+	FetchOptional(ctx context.Context, db Querier) (R, bool, error)
 	// SQL renders the query using the dialect bound to the query (PostgreSQL by
 	// default, or whatever was selected via Using).
 	SQL() (string, []any, error)
@@ -324,5 +327,23 @@ func (s *selectBuilder[R]) FetchSingle(ctx context.Context, db Querier) (R, erro
 		return rows[0], nil
 	default:
 		return zero, ErrTooManyRows
+	}
+}
+
+// FetchOptional returns the single row and true, the zero value and false when
+// the query matches no row, or ErrTooManyRows when it matches more than one.
+func (s *selectBuilder[R]) FetchOptional(ctx context.Context, db Querier) (R, bool, error) {
+	var zero R
+	rows, err := s.Fetch(ctx, db)
+	if err != nil {
+		return zero, false, err
+	}
+	switch len(rows) {
+	case 0:
+		return zero, false, nil
+	case 1:
+		return rows[0], true, nil
+	default:
+		return zero, false, ErrTooManyRows
 	}
 }

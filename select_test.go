@@ -129,3 +129,37 @@ func TestSelectUsingDialectOverride(t *testing.T) {
 		t.Errorf("sqlite = %q, want %q", sqliteSQL, want)
 	}
 }
+
+// TestDistinct verifies that SELECT DISTINCT renders in both dialects, with the
+// placeholder spelling being the only dialect-dependent difference.
+func TestDistinct(t *testing.T) {
+	tests := []struct {
+		name    string
+		dialect Dialect
+		want    string
+	}{
+		{
+			name:    "postgres",
+			dialect: Postgres(),
+			want:    `SELECT DISTINCT "book"."title" FROM "book" WHERE "book"."id" > $1`,
+		},
+		{
+			name:    "sqlite",
+			dialect: SQLite(),
+			want:    `SELECT DISTINCT "book"."title" FROM "book" WHERE "book"."id" > ?`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stmt := Select1(Book.Title).Distinct().From(Book).Where(Book.ID.GT(1))
+			got, _, err := stmt.SQLFor(tt.dialect)
+			if err != nil {
+				t.Fatalf("SQLFor error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

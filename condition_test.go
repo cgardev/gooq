@@ -64,3 +64,87 @@ func TestConditionIsField(t *testing.T) {
 		t.Errorf("sql = %q, want %q", sql, want)
 	}
 }
+
+// TestBooleanCombinators verifies the free-function And, Or, and Not, including
+// the variadic flattening that yields one flat group rather than nested pairs.
+func TestBooleanCombinators(t *testing.T) {
+	a := Book.ID.EQ(1)
+	b := Book.Title.EQ("x")
+	c := Book.AuthorID.EQ(2)
+
+	tests := []struct {
+		name string
+		cond Condition
+		want string
+	}{
+		{
+			name: "and flattened",
+			cond: And(a, b, c),
+			want: `("book"."id" = $1 AND "book"."title" = $2 AND "book"."author_id" = $3)`,
+		},
+		{
+			name: "or flattened",
+			cond: Or(a, b, c),
+			want: `("book"."id" = $1 OR "book"."title" = $2 OR "book"."author_id" = $3)`,
+		},
+		{
+			name: "and single returns as-is",
+			cond: And(a),
+			want: `"book"."id" = $1`,
+		},
+		{
+			name: "or single returns as-is",
+			cond: Or(b),
+			want: `"book"."title" = $1`,
+		},
+		{
+			name: "and empty is true",
+			cond: And(),
+			want: `1 = 1`,
+		},
+		{
+			name: "or empty is false",
+			cond: Or(),
+			want: `1 = 0`,
+		},
+		{
+			name: "not",
+			cond: Not(a),
+			want: `NOT ("book"."id" = $1)`,
+		},
+		{
+			name: "true constant",
+			cond: True(),
+			want: `1 = 1`,
+		},
+		{
+			name: "false constant",
+			cond: False(),
+			want: `1 = 0`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, _ := renderNode(Postgres(), tt.cond)
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestConstantConditionDialects verifies that True and False render identically
+// across both dialects, since they emit no placeholders.
+func TestConstantConditionDialects(t *testing.T) {
+	for _, d := range []Dialect{Postgres(), SQLite()} {
+		t.Run(d.Name(), func(t *testing.T) {
+			if got, _ := renderNode(d, True()); got != "1 = 1" {
+				t.Errorf("True(): got %q, want %q", got, "1 = 1")
+			}
+			if got, _ := renderNode(d, False()); got != "1 = 0" {
+				t.Errorf("False(): got %q, want %q", got, "1 = 0")
+			}
+		})
+	}
+}
