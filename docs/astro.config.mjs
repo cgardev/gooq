@@ -2,6 +2,7 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import { ion } from 'starlight-ion-theme';
+import starlightLlmsTxt from 'starlight-llms-txt';
 
 // https://astro.build/config
 export default defineConfig({
@@ -18,7 +19,17 @@ export default defineConfig({
 			// Apply the Ion theme, recolored with the monochrome
 			// palette defined in ./src/styles/theme.css. useCustomECTheme:false lets
 			// code blocks follow the same palette instead of Ion's built-in theme.
-			plugins: [ion({ useCustomECTheme: false })],
+			// starlightLlmsTxt generates llms.txt, llms-full.txt, and llms-small.txt
+			// at build time so language models can consume the documentation. It
+			// reads the Astro base path, so the files are served under /gooq.
+			plugins: [
+				ion({ useCustomECTheme: false }),
+				starlightLlmsTxt({
+					projectName: 'gooq',
+					description:
+						'A type-safe, fluent, zero-dependency SQL query builder for Go inspired by jOOQ. It provides parametric Field[T] columns, positional RecordN row types, step interfaces that enforce SQL clause order at compile time, and runtime dialect translation for PostgreSQL and SQLite.',
+				}),
+			],
 			customCss: ['./src/styles/theme.css'],
 			// The header logo and the browser tab icon both use the SQL file
 			// artwork. The logo is resolved relative to the project root, while the
