@@ -159,5 +159,5 @@ Write statements surface a few sentinel errors worth handling:
 - `gooq.ErrReturningUnsupported` — `Returning` was used on a dialect that does
   not support it.
 
-These and the query-side error values are listed on the
-[API Reference](/gooq/reference/api/) page.
+These and the query-side error values are described on the
+[Data Modification reference](/gooq/reference/dml/) page.

@@ -61,7 +61,40 @@ export default defineConfig({
 				},
 				{
 					label: 'Reference',
-					items: [{ label: 'API Reference', slug: 'reference/api' }],
+					items: [
+						{ label: 'Overview', slug: 'reference' },
+						{ label: 'SELECT Statements', slug: 'reference/select' },
+						{ label: 'Expressions & Operators', slug: 'reference/expressions' },
+						{
+							label: 'Functions, Aggregates, CASE & CAST',
+							slug: 'reference/functions',
+						},
+						{ label: 'Window Functions', slug: 'reference/window-functions' },
+						{
+							label: 'Subqueries & Set Operations',
+							slug: 'reference/subqueries-and-set-operations',
+						},
+						{ label: 'Data Modification', slug: 'reference/dml' },
+						{
+							label: 'Fetching & Mapping',
+							slug: 'reference/fetching-and-mapping',
+						},
+						{ label: 'Dialects', slug: 'reference/dialects' },
+						{ label: 'Code Generation', slug: 'reference/code-generation' },
+					],
+				},
+				{
+					label: 'Cookbook',
+					items: [
+						{ label: 'Overview', slug: 'cookbook' },
+						{ label: 'Querying Data', slug: 'cookbook/queries' },
+						{ label: 'Writing Data', slug: 'cookbook/writing-data' },
+						{ label: 'Mapping Results', slug: 'cookbook/mapping-results' },
+						{
+							label: 'Code Generation & Setup',
+							slug: 'cookbook/codegen-and-setup',
+						},
+					],
 				},
 			],
 		}),
